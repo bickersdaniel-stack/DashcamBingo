@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const bingoTitle = document.getElementById("bingoTitle");
     const gallery = document.getElementById("gallery");
     const colorPicker = document.getElementById("colorPicker");
+    let bestLines = 0; // Most lines completed on this card so far
 
     // Load the initial bingo card with default colors
     loadBingoCard();
@@ -28,10 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (i === 12) {
                         cell.textContent = "FREE";
                         cell.classList.add("center-cell", "crossed");
-                        cell.style.backgroundColor = "#4caf50"; // Set initial color of FREE cell
+                        cell.style.backgroundColor = colorPicker.value; // FREE starts crossed in the picked colour
                     } else {
                         cell.textContent = phrases[i];
-                        cell.style.backgroundColor = "white"; // Set default color to white for other cells
                     }
 
                     cell.addEventListener("click", () => {
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (cell.classList.contains("crossed")) {
                             cell.style.backgroundColor = colorPicker.value;
                         } else {
-                            cell.style.backgroundColor = i === 12 ? "#4caf50" : "white"; // Reset color
+                            cell.style.backgroundColor = ""; // Back to the normal colour (yellow for FREE)
                         }
 
                         checkBingo();
@@ -64,36 +64,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function checkBingo() {
         const cells = Array.from(bingoCard.children);
-        const isBingo = checkRows(cells) || checkColumns(cells) || checkDiagonals(cells);
+        const lines = checkRows(cells) + checkColumns(cells) + checkDiagonals(cells);
 
-        if (isBingo) {
-            bingoTitle.style.display = 'block';
+        bingoTitle.style.display = lines > 0 ? 'block' : 'none';
+
+        // Only screenshot when a new line is completed, not on every click after a bingo
+        if (lines > bestLines) {
+            bestLines = lines;
             captureScreenshot();
         }
     }
 
     function checkRows(cells) {
+        let lines = 0;
         for (let i = 0; i < 5; i++) {
             if (cells.slice(i * 5, i * 5 + 5).every(cell => cell.classList.contains('crossed'))) {
-                return true;
+                lines++;
             }
         }
-        return false;
+        return lines;
     }
 
     function checkColumns(cells) {
+        let lines = 0;
         for (let i = 0; i < 5; i++) {
             if ([0, 5, 10, 15, 20].map(j => cells[i + j]).every(cell => cell.classList.contains('crossed'))) {
-                return true;
+                lines++;
             }
         }
-        return false;
+        return lines;
     }
 
     function checkDiagonals(cells) {
         const diagonal1 = [0, 6, 12, 18, 24].every(i => cells[i].classList.contains('crossed'));
         const diagonal2 = [4, 8, 12, 16, 20].every(i => cells[i].classList.contains('crossed'));
-        return diagonal1 || diagonal2;
+        return diagonal1 + diagonal2;
     }
 
     function captureScreenshot() {
@@ -124,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.refreshCard = () => {
         bingoTitle.style.display = 'none';
+        bestLines = 0;
         loadBingoCard(); // Reload the bingo card only
     };
 });

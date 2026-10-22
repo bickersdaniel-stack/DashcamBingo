@@ -5,11 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashcam Bingo</title>
     <style>
+        /* Colours (dark versions below follow the device's dark mode setting) */
+        :root {
+            color-scheme: light dark;
+            --page-bg: #f0f0f0;
+            --text: #000;
+            --card-bg: #ffffff;
+            --cell-bg: #ffffff;
+            --cell-border: #ddd;
+            --free-bg: #ffeb3b;
+            --panel-bg: #e0e0e0;
+            --panel-heading: #333;
+            --panel-shadow: rgba(0,0,0,0.2);
+            --img-border: #333;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --page-bg: #121212;
+                --text: #e8e8e8;
+                --card-bg: #121212;
+                --cell-bg: #1e1e1e;
+                --cell-border: #3a3a3a;
+                --free-bg: #d4b800;
+                --panel-bg: #1a1a1a;
+                --panel-heading: #ddd;
+                --panel-shadow: rgba(0,0,0,0.6);
+                --img-border: #555;
+            }
+        }
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0;
+            background-color: var(--page-bg);
+            color: var(--text);
         }
         /* Title Bar */
         .title-bar {
@@ -62,21 +91,25 @@
             margin-bottom: 10px;
         }
         .bingo-card {
+            /* 120px squares, shrinking to fit narrow screens */
+            --cell: min(120px, calc((100vw - 80px) / 5));
             display: grid;
-            grid-template-columns: repeat(5, 120px);
-            grid-template-rows: repeat(5, 120px);
+            grid-template-columns: repeat(5, var(--cell));
+            grid-auto-rows: minmax(var(--cell), auto);
             gap: 5px;
         }
         .bingo-cell {
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #ffffff;
-            border: 2px solid #ddd;
-            font-size: 18px;
+            background-color: var(--cell-bg);
+            border: 2px solid var(--cell-border);
+            /* Text and padding scale with the square: 16px text and 10px/4px padding at full size */
+            font-size: max(10px, calc(var(--cell) * 2 / 15));
             font-weight: bold;
             text-align: center;
-            padding: 10px;
+            padding: calc(var(--cell) / 12) calc(var(--cell) / 30);
+            overflow-wrap: anywhere;
             cursor: pointer;
             user-select: none;
         }
@@ -86,7 +119,7 @@
             text-decoration: line-through;
         }
         .center-cell {
-            background-color: #ffeb3b;
+            background-color: var(--free-bg);
             color: black;
             font-weight: bold;
         }
@@ -106,16 +139,16 @@
             top: 80px; /* Align below the title bar */
             width: 16.67%; /* 1/6th of the screen */
             height: calc(100vh - 80px);
-            background-color: #e0e0e0;
+            background-color: var(--panel-bg);
             padding: 20px;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+            box-shadow: -2px 0 5px var(--panel-shadow);
             overflow-y: auto;
             text-align: center;
         }
         .screenshot-container h2 {
             margin-bottom: 10px;
             font-size: 18px;
-            color: #333;
+            color: var(--panel-heading);
         }
         .gallery {
             display: grid;
@@ -126,13 +159,13 @@
             width: 100%;
             height: auto;
             cursor: pointer;
-            border: 2px solid #333;
+            border: 2px solid var(--img-border);
         }
         #bingoCardContainer {
             display: inline-block;
 
             text-align: center;
-            background-color: white;
+            background-color: var(--card-bg);
         }
         
         .title-overlay {
@@ -156,12 +189,42 @@
             position: absolute;
             right: 0;
         }
+        /* Narrow screens: put the winning cards under the bingo card instead of on top of it */
+        @media (max-width: 1050px) {
+            .container {
+                flex-direction: column;
+            }
+            .screenshot-container {
+                position: static;
+                width: auto;
+                height: auto;
+                box-shadow: none;
+            }
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+        /* Phones: hide the picker's label so it doesn't cover the title */
+        @media (max-width: 600px) {
+            .title-bar label {
+                display: none;
+            }
+            .bingo-section {
+                padding: 20px 8px;
+            }
+            .bingo-card {
+                --cell: calc((100vw - 40px) / 5);
+            }
+            .bingo-cell {
+                hyphens: auto;
+            }
+        }
     </style>
 </head>
 <body>  
     <div class="title-bar">
         <div class="pick"> <label for="colorPicker" style="margin-right: 10px; color: white;">Colour Picker:</label>
-            <input type="color" id="colorPicker" value="#4caf50"> <!-- Default color is green --></div>
+            <input type="color" id="colorPicker" value="#4caf50" title="Colour Picker"> <!-- Default color is green --></div>
         <span>Dashcam Bingo</span>
     </div>
     

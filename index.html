@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        try {
+            const theme = localStorage.getItem("dashcamBingo.theme");
+            if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+        } catch (e) {}
+    </script>
     <style>
-        /* Colours (dark versions below follow the device's dark mode setting) */
+        /* Colours (dark versions below are used in dark mode, or when Dark is picked) */
         :root {
             color-scheme: light dark;
             --page-bg: #f0f0f0;
@@ -20,7 +27,7 @@
             --img-border: #333;
         }
         @media (prefers-color-scheme: dark) {
-            :root {
+            :root:not([data-theme="light"]) {
                 --page-bg: #121212;
                 --text: #e8e8e8;
                 --card-bg: #121212;
@@ -32,6 +39,22 @@
                 --panel-shadow: rgba(0,0,0,0.6);
                 --img-border: #555;
             }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --page-bg: #121212;
+            --text: #e8e8e8;
+            --card-bg: #121212;
+            --cell-bg: #1e1e1e;
+            --cell-border: #3a3a3a;
+            --free-bg: #d4b800;
+            --panel-bg: #1a1a1a;
+            --panel-heading: #ddd;
+            --panel-shadow: rgba(0,0,0,0.6);
+            --img-border: #555;
+        }
+        :root[data-theme="light"] {
+            color-scheme: light;
         }
         body {
             font-family: Arial, sans-serif;
@@ -189,6 +212,20 @@
             position: absolute;
             right: 0;
         }
+        .theme-button {
+            position: absolute;
+            left: 10px;
+            margin: 0;
+            padding: 6px 12px;
+            font-size: 14px;
+            color: white;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 4px;
+        }
+        .theme-button:hover {
+            background: rgba(255,255,255,0.1);
+        }
         /* Narrow screens: put the winning cards under the bingo card instead of on top of it */
         @media (max-width: 1050px) {
             .container {
@@ -204,9 +241,9 @@
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             }
         }
-        /* Phones: hide the picker's label so it doesn't cover the title */
+        /* Phones: hide the picker's label and theme name so they don't cover the title */
         @media (max-width: 600px) {
-            .title-bar label {
+            .title-bar label, .theme-label {
                 display: none;
             }
             .bingo-section {
@@ -223,6 +260,7 @@
 </head>
 <body>  
     <div class="title-bar">
+        <button id="themeButton" class="theme-button" title="Switch between System, Light and Dark">🖥️<span class="theme-label"> System</span></button>
         <div class="pick"> <label for="colorPicker" style="margin-right: 10px; color: white;">Colour Picker:</label>
             <input type="color" id="colorPicker" value="#4caf50" title="Colour Picker"> <!-- Default color is green --></div>
         <span>Dashcam Bingo</span>

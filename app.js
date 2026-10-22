@@ -3,7 +3,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const bingoTitle = document.getElementById("bingoTitle");
     const gallery = document.getElementById("gallery");
     const colorPicker = document.getElementById("colorPicker");
+    const themeButton = document.getElementById("themeButton");
     let bestLines = 0; // Most lines completed on this card so far
+
+    // Theme button cycles System -> Light -> Dark, remembered on this device
+    const themes = ["system", "light", "dark"];
+    const themeLabels = { system: ["🖥️", "System"], light: ["☀️", "Light"], dark: ["🌙", "Dark"] };
+    let theme = themes.includes(load("theme")) ? load("theme") : "system";
+    showTheme();
+
+    themeButton.addEventListener("click", () => {
+        theme = themes[(themes.indexOf(theme) + 1) % themes.length];
+        save("theme", theme);
+        showTheme();
+    });
+
+    // Use the colour picked last time on this device
+    const savedColour = load("colour");
+    if (savedColour) colorPicker.value = savedColour;
 
     // Load the initial bingo card with default colors
     loadBingoCard();
@@ -11,7 +28,27 @@ document.addEventListener("DOMContentLoaded", () => {
     // Event listener for color picker to change color of all crossed cells
     colorPicker.addEventListener("input", (event) => {
         setSelectedCellColor(event.target.value);
+        save("colour", event.target.value);
     });
+
+    function showTheme() {
+        if (theme === "system") {
+            delete document.documentElement.dataset.theme;
+        } else {
+            document.documentElement.dataset.theme = theme;
+        }
+        const [icon, name] = themeLabels[theme];
+        themeButton.innerHTML = `${icon}<span class="theme-label"> ${name}</span>`;
+    }
+
+    // Saved settings live in this browser only; ignore errors if storage is blocked
+    function load(key) {
+        try { return localStorage.getItem("dashcamBingo." + key); } catch (e) { return null; }
+    }
+
+    function save(key, value) {
+        try { localStorage.setItem("dashcamBingo." + key, value); } catch (e) {}
+    }
 
     function loadBingoCard() {
         bingoCard.innerHTML = ''; // Clear any existing cells

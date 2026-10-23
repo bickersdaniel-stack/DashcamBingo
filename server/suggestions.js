@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import express, { Router } from "express";
 import { isAdmin } from "./auth.js";
-import { defaultPacks, save, store } from "./store.js";
+import { defaultPacks, isBlocked, save, store } from "./store.js";
 
 export const suggestions = Router();
 export const json = express.json({ limit: "2kb" }); // JSON only, so other sites can't post here with a plain form
@@ -37,6 +37,7 @@ suggestions.get("/api/suggestions", signedIn, (req, res) => {
 
 suggestions.post("/api/suggestions", signedIn, json, (req, res) => {
     const user = req.session.user;
+    if (isBlocked(user.id)) return res.status(403).json({ error: "You can't suggest squares right now." });
     const text = tidy(req.body?.text);
     const description = tidy(req.body?.description);
     const problem = problemWith(text) ?? descriptionProblem(description);

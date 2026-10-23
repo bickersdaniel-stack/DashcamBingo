@@ -1,10 +1,20 @@
-// Admin page: review suggested squares, edit every card and its description, and sort cards into packs
+// Admin page: review suggested squares, edit every card and its description, sort cards into packs, and manage people
 const $ = id => document.getElementById(id);
+const pageSize = 25;
+const pages = { card: 1, user: 1 }; // The page each long list is on
 let packs = [];
 let cards = [];
+let users = [];
 
 document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
-["cardSearch", "cardPackFilter", "cardSort"].forEach(id => $(id).addEventListener("input", showCards));
+["cardSearch", "cardPackFilter", "cardSort"].forEach(id => $(id).addEventListener("input", () => {
+    pages.card = 1;
+    showCards();
+}));
+$("userSearch").addEventListener("input", () => {
+    pages.user = 1;
+    showUsers();
+});
 
 $("newCardForm").addEventListener("submit", async event => {
     event.preventDefault();
@@ -24,9 +34,10 @@ $("newPackForm").addEventListener("submit", async event => {
 });
 
 async function load() {
-    const [all, waiting] = await Promise.all([api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions")]);
+    const [all, waiting, people] = await Promise.all([api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users")]);
     if (!all.ok) return message(all.data.error, false);
     ({ packs, cards } = all.data);
+    users = people.data;
     fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
     const filter = $("cardPackFilter").value;
     $("cardPackFilter").replaceChildren(new Option("All packs", "all"), ...packs.map(pack => new Option(pack.name, pack.id)));
@@ -34,6 +45,7 @@ async function load() {
     showSuggestions(waiting.data.pending ?? []);
     showCards();
     showPacks();
+    showUsers();
     return waiting.data.pending?.length ?? 0;
 }
 
@@ -71,7 +83,8 @@ function showCards() {
             return sort === "most" ? rb - ra : ra - rb;
         });
     $("cardCount").textContent = `${shown.length} of ${cards.length} cards`;
-    $("cardList").replaceChildren(...(shown.length ? shown : [null]).map(card => {
+    showPager("card", shown.length, showCards);
+    $("cardList").replaceChildren(...(shown.length ? onePage("card", shown) : [null]).map(card => {
         if (!card) return el("li", "item empty", "No cards match.");
         const item = el("li", "item admin-row");
         const text = input(card.text, 60, "Card wording");
@@ -116,6 +129,65 @@ function showPacks() {
         item.append(name, description, onLabel, el("span", "admin-stats", `${pack.count} card${pack.count === 1 ? "" : "s"}`), save, remove);
         return item;
     }));
+}
+
+const signedInWith = { discord: "Discord", google: "Google", email: "Email link" };
+
+function showUsers() {
+    const search = $("userSearch").value.trim().toLowerCase();
+    const shown = users.filter(user => user.name.toLowerCase().includes(search));
+    $("userCount").textContent = `${shown.length} of ${users.length} people`;
+    showPager("user", shown.length, showUsers);
+    $("userList").replaceChildren(...(shown.length ? onePage("user", shown) : [null]).map(user => {
+        if (!user) return el("li", "item empty", "Nobody matches.");
+        const item = el("li", "item admin-row user-row");
+        const change = async (body, text) => {
+            if (done(await api("PATCH", `/api/admin/users/${encodeURIComponent(user.id)}`, body), text)) load();
+        };
+        const who = el("span", "user-who");
+        const seen = user.seenAt ? `last played ${new Date(user.seenAt).toLocaleDateString()}` : "not played since this update";
+        who.append(el("strong", "", user.name), el("span", "item-by", `${signedInWith[user.via]} · ${seen}`));
+        const tags = [user.owner ? "Owner" : user.admin && "Admin", user.blocked && "Blocked"].filter(Boolean);
+        const wins = Object.assign(input(String(user.wins), 6, `Wins for ${user.name}`), { type: "number", min: 0, max: 100000 });
+        wins.classList.add("wins-input");
+        const winsLabel = el("label", "check-label", "🏆 ");
+        winsLabel.append(wins);
+        const saveWins = button("Save", "btn btn-primary", () => change({ wins: Number(wins.value) }, `Saved ${user.name}'s wins.`));
+        showSaveWhenEdited(item, saveWins);
+        item.append(Object.assign(el("img", "avatar"), { src: user.avatar, alt: "" }), who, ...tags.map(tag => el("span", `user-tag ${tag.toLowerCase()}`, tag)),
+            winsLabel, saveWins, el("span", "admin-stats", `Suggested ${user.suggested} · ${user.approved} added`));
+        if (!user.owner) {
+            item.append(button(user.admin ? "Remove admin" : "Make admin", "btn btn-quiet",
+                () => change({ admin: !user.admin }, user.admin ? `${user.name} isn't an admin now.` : `${user.name} is an admin now.`)));
+            item.append(button(user.blocked ? "Unblock" : "Block", user.blocked ? "btn btn-quiet" : "btn btn-quiet danger", () => {
+                if (!user.blocked && !confirm(`Block ${user.name}? They're taken out of any room they're in, and can't join rooms or suggest squares until you unblock them.`)) return;
+                change({ blocked: !user.blocked }, user.blocked ? `Unblocked ${user.name}.` : `Blocked ${user.name}.`);
+            }));
+        }
+        return item;
+    }));
+}
+
+// One page of a long list; the page stays in range when the list gets shorter
+function onePage(name, list) {
+    pages[name] = Math.min(pages[name], Math.ceil(list.length / pageSize) || 1);
+    return list.slice((pages[name] - 1) * pageSize, pages[name] * pageSize);
+}
+
+function showPager(name, total, redraw) {
+    const count = Math.ceil(total / pageSize);
+    const page = Math.min(pages[name], count || 1);
+    const go = to => () => {
+        pages[name] = to;
+        redraw();
+        $(`${name}List`).scrollIntoView({ block: "start", behavior: "smooth" });
+    };
+    const previous = button("‹ Previous", "btn btn-quiet", go(page - 1));
+    const next = button("Next ›", "btn btn-quiet", go(page + 1));
+    previous.disabled = page === 1;
+    next.disabled = page === count;
+    $(`${name}Pager`).replaceChildren(previous, el("span", "pager-label", `Page ${page} of ${count}`), next);
+    $(`${name}Pager`).hidden = count <= 1;
 }
 
 function selectTab(tab) {

@@ -9,6 +9,7 @@ import { auth, isAdmin } from "./auth.js";
 import { cards } from "./cards.js";
 import { cardsIn, defaultPacks, store } from "./store.js";
 import { suggestions } from "./suggestions.js";
+import { users } from "./users.js";
 import { setupRooms } from "./rooms.js";
 
 for (const key of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SESSION_SECRET", "PUBLIC_URL"]) {
@@ -38,6 +39,7 @@ app.use((req, res, next) => {
 app.use(auth);
 app.use(suggestions);
 app.use(cards);
+app.use(users);
 app.get("/healthz", (req, res) => res.send("ok"));
 // The solo game here deals from the packs that are on by default (or every card, if they hold too few for a card)
 app.get("/phrases.txt", (req, res) => {

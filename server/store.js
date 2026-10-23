@@ -46,9 +46,13 @@ export function touchProfile(user) {
     const row = store.profiles[user.id] ??= { wins: 0 };
     row.name = user.name;
     row.avatar = user.avatar;
+    row.seenAt = Date.now();
     save();
     return row;
 }
+
+// An admin can block someone from joining rooms and suggesting squares
+export const isBlocked = id => store.profiles[id]?.blocked === true;
 
 export function addWin(userId) {
     const row = store.profiles[userId] ??= { wins: 0 };

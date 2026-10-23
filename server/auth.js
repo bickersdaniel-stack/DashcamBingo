@@ -12,7 +12,9 @@ const googleRedirect = `${PUBLIC_URL}/auth/google/callback`;
 const linkMinutes = 15;
 
 export const auth = Router();
-export const isAdmin = user => !!user && adminIds.includes(user.id);
+// Owners (ADMIN_IDS in .env) are always admins; other admins are set on the admin page
+export const isOwner = id => adminIds.includes(id);
+export const isAdmin = user => !!user && (isOwner(user.id) || store.profiles[user.id]?.admin === true);
 
 auth.get("/api/me", (req, res) => {
     if (req.session.user) return res.json({

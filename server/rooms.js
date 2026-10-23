@@ -1,6 +1,6 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
-import { addWin, cardsIn, countSpot, defaultPacks, removeWin, save, store, touchProfile } from "./store.js";
+import { addWin, cardsIn, countSpot, defaultPacks, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -11,8 +11,10 @@ const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
+let roomsIo = null; // Kept so changes from the admin page reach rooms in progress
 
 export function setupRooms(io) {
+    roomsIo = io;
     io.on("connection", socket => {
         const user = socket.request.session.user;
         socket.data.userId = user.id;
@@ -20,6 +22,7 @@ export function setupRooms(io) {
         // The host can give the video when creating the room, so round 1 starts with it
         socket.on("room:create", (data, reply) => {
             if (typeof reply !== "function") return;
+            if (isBlocked(user.id)) return reply({ error: "You can't host or join rooms right now." });
             if (rooms.size >= maxRooms) return reply({ error: "Too many rooms are open right now. Try again later." });
             let code;
             do code = Array.from({ length: 5 }, () => codeLetters[Math.floor(Math.random() * codeLetters.length)]).join("");
@@ -39,6 +42,7 @@ export function setupRooms(io) {
             if (typeof reply !== "function") return;
             const room = rooms.get(String(data?.code).toUpperCase());
             if (!room) return reply({ error: "That room doesn't exist. It may have ended." });
+            if (isBlocked(user.id)) return reply({ error: "You can't host or join rooms right now." });
             if (socket.data.code) return reply({ error: "Already in a room." });
             socket.data.code = room.code;
             socket.join(room.code);
@@ -158,26 +162,7 @@ export function setupRooms(io) {
         // Leaving takes you out of the room on every tab; a host who leaves hands over straight away
         socket.on("room:leave", reply => {
             const room = rooms.get(socket.data.code);
-            if (!room) return typeof reply === "function" && reply();
-            if (io.sockets.sockets.get(room.streamSocket)?.data.userId === user.id) endStream(io, room);
-            for (const other of io.sockets.sockets.values()) {
-                if (other.data.code !== room.code || other.data.userId !== user.id) continue;
-                other.data.code = null;
-                other.leave(room.code);
-                if (other !== socket) other.emit("room:gone", "You left this room in another tab.");
-            }
-            room.players.delete(user.id);
-            room.connections.delete(user.id);
-            room.round.cards.delete(user.id);
-            if (room.players.size === 0) rooms.delete(room.code);
-            else {
-                io.to(room.code).emit("player:left", user.id);
-                addEvent(io, room, { type: "left", userId: user.id, name: user.name, avatar: user.avatar });
-                if (room.hostId === user.id) {
-                    room.hostAwaySince = 0; // Counts as gone long enough
-                    checkHost(io, room);
-                }
-            }
+            if (room) removePlayer(io, room, user, "You left this room in another tab.", socket);
             if (typeof reply === "function") reply();
         });
 
@@ -237,6 +222,45 @@ export function setupRooms(io) {
             if (room.emptySince && Date.now() - room.emptySince > emptyRoomMs) rooms.delete(code);
         }
     }, 10 * 60 * 1000).unref();
+}
+
+// Takes someone out of a room on every tab they have open (except the one that asked); a host who goes hands over straight away
+function removePlayer(io, room, user, message, except = null) {
+    if (io.sockets.sockets.get(room.streamSocket)?.data.userId === user.id) endStream(io, room);
+    for (const other of io.sockets.sockets.values()) {
+        if (other.data.code !== room.code || other.data.userId !== user.id) continue;
+        other.data.code = null;
+        other.leave(room.code);
+        if (other !== except) other.emit("room:gone", message);
+    }
+    room.players.delete(user.id);
+    room.connections.delete(user.id);
+    room.round.cards.delete(user.id);
+    if (room.players.size === 0) return rooms.delete(room.code);
+    io.to(room.code).emit("player:left", user.id);
+    addEvent(io, room, { type: "left", userId: user.id, name: user.name, avatar: user.avatar });
+    if (room.hostId === user.id) {
+        room.hostAwaySince = 0; // Counts as gone long enough
+        checkHost(io, room);
+    }
+}
+
+// An admin blocked someone: out of every room they're in
+export function kickUser(userId) {
+    for (const room of rooms.values()) {
+        const player = room.players.get(userId);
+        if (player) removePlayer(roomsIo, room, player, "An admin removed you from this room.");
+    }
+}
+
+// An admin changed someone's wins: rooms they're in show the new count
+export function refreshPlayer(userId) {
+    for (const room of rooms.values()) {
+        const player = room.players.get(userId);
+        if (!player) continue;
+        player.wins = store.profiles[userId]?.wins ?? player.wins;
+        roomsIo.to(room.code).emit("player:update", playerInfo(room, player));
+    }
 }
 
 // The id changes every time, so marks meant for a replaced round can't land on the new cards

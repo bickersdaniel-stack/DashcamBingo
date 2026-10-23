@@ -41,7 +41,7 @@ if (me) {
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
     showMyWins(me.wins);
-    setUpAccountMenu();
+    setUpMenu("account", "account");
     setUpSuggestions();
     welcome();
 }
@@ -151,6 +151,8 @@ function joinRoom() {
         state.players = state.players.filter(player => player.id !== id);
         showPlayers();
     });
+    $("roomMenu").hidden = false;
+    setUpMenu("room", "roomMenu");
     $("leaveButton").hidden = false;
     $("leaveButton").addEventListener("click", () => socket.timeout(5000).emit("room:leave", () => location.assign("/")));
     $("endRoomButton").addEventListener("click", () => {
@@ -197,6 +199,7 @@ function joinRoom() {
         if (!state) return;
         state.rerolls = rerolls;
         showReroll();
+        showRerollLock();
     });
     socket.on("packs:update", packs => {
         if (state) state.packs = packs;
@@ -222,7 +225,9 @@ function joinRoom() {
         $("hostNote").hidden = true;
         socket.emit("host:setVideo", { videoId: video.id, start: video.start });
     });
-    $("startRoundButton").addEventListener("click", () => {
+    // Start round and Room settings are in both the Room menu and the host tile
+    document.querySelectorAll(".start-round").forEach(button => button.addEventListener("click", () => {
+        setPanelOpen("room", false);
         const video = readVideoLink();
         if (video === false) return;
         const untouched = state.events.length === 0 && state.players.every(player => player.marked === 0);
@@ -230,6 +235,12 @@ function joinRoom() {
         $("hostNote").hidden = true;
         socket.emit("host:newRound", video ? { videoId: video.id, start: video.start } : {});
         if (video && !shareStream) startSharing(socket); // Browser still shows the picker the first time
+    }));
+    // Locking sets rerolls to Off; unlocking puts back what they were (one, if they were never on)
+    let unlockedRerolls = 1;
+    $("lockRerollsButton").addEventListener("click", () => {
+        if (state.rerolls) unlockedRerolls = state.rerolls;
+        socket.emit("host:rerolls", { rerolls: state.rerolls ? 0 : unlockedRerolls });
     });
     const savedQuality = load("streamQuality");
     if (qualities[savedQuality]) $("streamQuality").value = savedQuality;
@@ -239,11 +250,12 @@ function joinRoom() {
         applyQuality();
         applyCaptureQuality();
     });
-    $("settingsButton").addEventListener("click", async () => {
+    document.querySelectorAll(".open-settings").forEach(button => button.addEventListener("click", async () => {
+        setPanelOpen("room", false);
         $("settingsForm").prepend($("roomOptions"));
         await fillRoomOptions(state.packs, state.rerolls ?? 0);
         $("settingsDialog").showModal();
-    });
+    }));
     $("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
     $("settingsForm").addEventListener("submit", event => {
         event.preventDefault();
@@ -291,6 +303,7 @@ function showRoom(socket) {
     marked.forEach(index => setCrossed($("bingoCard").children[index], true));
     $("bingoAlert").hidden = countLines(marked) === 0;
     showReroll();
+    showRerollLock();
     showVideo(socket);
     showPlayers();
     showFeed();
@@ -318,10 +331,16 @@ function checkBingo() {
 function showVideo(socket) {
     const isHost = state.hostId === me.id;
     const hosting = isHost && !!state.round.video;
+    const withVideo = hosting || !$("liveVideo").hidden;
     $("hostBar").hidden = !isHost;
-    $("endRoomButton").hidden = !isHost;
+    $("endRoomButton").hidden = $("roomHostActions").hidden = !isHost;
+    // The host's video controls sit in the video tile's title bar once there's a video, and in the Room menu until then
+    $(isHost && withVideo ? "videoTools" : "roomVideoSlot").append($("hostBar"));
+    $("setVideoButton").textContent = withVideo ? "Change video" : "Set video";
+    $("videoLabel").hidden = isHost && withVideo;
+    $("roomVideoSection").hidden = !isHost || withVideo;
     if (isHost) fillLockedLink();
-    arrange(hosting || !$("liveVideo").hidden);
+    arrange(withVideo, isHost);
     if (hosting) startPlayer(socket, state.round.video);
     else stopPlayer();
     if (shareStream) cropShare();
@@ -346,9 +365,18 @@ function readVideoLink() {
     return video;
 }
 
-// A host playing a video, or a viewer watching the host's stream, gets the tiles laid out around the video
-function arrange(withVideo) {
-    useLayout(withVideo ? "video" : "plain");
+// A host playing a video, or a viewer watching the host's stream, gets the tiles laid out around the video;
+// the host also gets their own tile
+function arrange(withVideo, isHost = false) {
+    useLayout(withVideo ? "video" : "plain", isHost);
+}
+
+// The host tile's lock: locked means rerolls are off, so nobody can reroll
+function showRerollLock() {
+    const locked = !state.rerolls;
+    $("lockRerollsButton").setAttribute("aria-pressed", locked);
+    $("lockRerollsLabel").textContent = locked ? "Unlock rerolls" : "Lock rerolls";
+    $("rerollStatus").textContent = locked ? "Nobody can reroll." : `Everyone can reroll ${state.rerolls === 1 ? "once" : `${state.rerolls} times`} a round.`;
 }
 
 async function startPlayer(socket, video) {
@@ -750,25 +778,28 @@ function leaveRoomView(socket, message) {
     arrange(false);
     $("roomGoneTitle").textContent = "Room closed";
     $("roomGoneText").textContent = message;
-    $("leaveButton").hidden = $("endRoomButton").hidden = true;
+    $("roomMenu").hidden = true;
     show("roomGone");
 }
 
 function setMenuOpen(open) {
-    $("accountPanel").hidden = !open;
-    $("accountButton").setAttribute("aria-expanded", open);
+    setPanelOpen("account", open);
 }
 
-// Your picture opens the menu; clicking elsewhere or pressing Escape closes it
-function setUpAccountMenu() {
-    const setOpen = setMenuOpen;
-    $("accountButton").addEventListener("click", () => setOpen($("accountPanel").hidden));
+function setPanelOpen(name, open) {
+    $(`${name}Panel`).hidden = !open;
+    $(`${name}Button`).setAttribute("aria-expanded", open);
+}
+
+// Your picture (or the Room button) opens its menu; clicking elsewhere or pressing Escape closes it
+function setUpMenu(name, wrapId) {
+    $(`${name}Button`).addEventListener("click", () => setPanelOpen(name, $(`${name}Panel`).hidden));
     document.addEventListener("click", event => {
         // The path, not the target: the theme button redraws itself, so its clicked icon is gone by now
-        if (!event.composedPath().includes($("account"))) setOpen(false);
+        if (!event.composedPath().includes($(wrapId))) setPanelOpen(name, false);
     });
     document.addEventListener("keydown", event => {
-        if (event.key === "Escape") setOpen(false);
+        if (event.key === "Escape") setPanelOpen(name, false);
     });
 }
 

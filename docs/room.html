@@ -26,7 +26,63 @@
         </div>
         <h1 class="bar-title">Dashcam Bingo</h1>
         <div class="bar-side">
-            <!-- Your picture opens a menu with the look settings and leaving or signing out -->
+            <!-- The room's own menu: invite, the host's video and round controls, the layout, and leaving -->
+            <div class="account-menu room-menu" id="roomMenu" hidden>
+                <button class="account-button room-button" id="roomButton" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="roomPanel">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5a2 2 0 012-2h7a2 2 0 012 2v14a2 2 0 01-2 2h-7a2 2 0 01-2-2v-2M3 12h10m0 0l-3-3m3 3l-3 3"/></svg>
+                    <span><span class="room-word">Room </span><span class="room-code" id="roomCode"></span></span>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="account-panel room-panel" id="roomPanel" hidden>
+                    <button class="pill invite-button" id="copyInviteButton" type="button">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                        <span id="copyInviteLabel">Copy invite link</span>
+                    </button>
+                    <div id="roomVideoSection" hidden>
+                        <p class="menu-label">Video</p>
+                        <div id="roomVideoSlot">
+                            <form class="host-bar" id="hostBar" hidden>
+                                <input class="link-input" id="videoLink" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link">
+                                <button class="btn" id="setVideoButton" type="submit">Change video</button>
+                                <label class="quality-label">Quality
+                                    <select class="quality-select" id="streamQuality" aria-label="Stream quality">
+                                        <option value="auto">Auto</option>
+                                        <option value="480">480p</option>
+                                        <option value="720">720p</option>
+                                        <option value="1080">1080p</option>
+                                    </select>
+                                </label>
+                                <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
+                                <p class="share-status" id="shareStatus" hidden></p>
+                                <p class="host-note" id="hostNote" hidden>
+                                    <span id="hostMessage"></span>
+                                    <a id="hostYouTubeLink" target="_blank" rel="noopener" hidden>Open on YouTube</a>
+                                </p>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="menu-actions" id="roomHostActions" hidden>
+                        <button class="menu-item start-round" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Start round</button>
+                        <button class="menu-item open-settings" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg> Room settings</button>
+                    </div>
+                    <div class="room-layout" id="layoutMenu" hidden>
+                        <p class="menu-label">Room layout</p>
+                        <div class="layout-presets" id="layoutPresets"></div>
+                        <div class="layout-toggles" id="layoutToggles"></div>
+                    </div>
+                    <div class="menu-actions">
+                        <button class="menu-item" id="leaveButton" type="button" hidden>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                            Leave room
+                        </button>
+                        <button class="menu-item danger" id="endRoomButton" type="button" hidden>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                            End room for everyone
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Your picture opens a menu with the look settings, suggestions and signing out -->
             <div class="account-menu" id="account" hidden>
                 <button class="account-button" id="accountButton" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountPanel">
                     <img class="avatar my-avatar" alt="">
@@ -55,11 +111,6 @@
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
                         Custom colour
                     </label>
-                    <div id="layoutMenu" hidden>
-                        <p class="menu-label">Room layout</p>
-                        <div class="layout-presets" id="layoutPresets"></div>
-                        <div class="layout-toggles" id="layoutToggles"></div>
-                    </div>
                     <div class="menu-actions">
                         <button class="menu-item" id="suggestButton" type="button">
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
@@ -69,14 +120,6 @@
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span id="manageLabel">Manage cards</span>
                         </a>
-                        <button class="menu-item" id="leaveButton" type="button" hidden>
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                            Leave room
-                        </button>
-                        <button class="menu-item danger" id="endRoomButton" type="button" hidden>
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg>
-                            End room for everyone
-                        </button>
                         <form method="post" action="/auth/logout">
                             <button class="menu-item" type="submit">
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
@@ -182,31 +225,11 @@
                 <a class="btn" href="/">Back to start</a>
             </div>
 
-            <form class="host-bar" id="hostBar" hidden>
-                <input class="link-input" id="videoLink" placeholder="Paste a YouTube link, or leave empty for no video" autocomplete="off" spellcheck="false" aria-label="YouTube link">
-                <button class="btn" type="submit">Change video</button>
-                <button class="btn btn-quiet" id="startRoundButton" type="button">Start round</button>
-                <label class="quality-label">Quality
-                    <select class="quality-select" id="streamQuality" aria-label="Stream quality">
-                        <option value="auto">Auto</option>
-                        <option value="480">480p</option>
-                        <option value="720">720p</option>
-                        <option value="1080">1080p</option>
-                    </select>
-                </label>
-                <button class="btn btn-quiet" id="settingsButton" type="button">Room settings</button>
-                <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
-                <p class="share-status" id="shareStatus" hidden></p>
-                <p class="host-note" id="hostNote" hidden>
-                    <span id="hostMessage"></span>
-                    <a id="hostYouTubeLink" target="_blank" rel="noopener" hidden>Open on YouTube</a>
-                </p>
-            </form>
             <!-- The room's tiles: drag a title bar to move one, drag an edge to resize, x to hide (see layout.js) -->
             <div class="room-grid grid-stack" id="roomGrid" hidden>
                 <div class="grid-stack-item" gs-id="video">
                     <div class="grid-stack-item-content widget">
-                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span>Video</span><button class="widget-hide" type="button" data-hide aria-label="Hide video" title="Hide video"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span id="videoLabel">Video</span><div class="video-tools" id="videoTools"></div><button class="widget-hide" type="button" data-hide aria-label="Hide video" title="Hide video"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
                         <div class="widget-body video-body">
                             <div class="video-frame" id="videoFrame">
                                 <div class="player-slot" id="playerSlot"></div>
@@ -224,13 +247,9 @@
                 </div>
                 <div class="grid-stack-item" gs-id="card">
                     <div class="grid-stack-item-content widget" id="game">
-                        <div class="widget-head room-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>
-                            <span>Room <span class="room-code" id="roomCode"></span></span>
+                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>
+                            <span>Card</span>
                             <span class="round-number" id="roundNumber"></span>
-                            <button class="pill" id="copyInviteButton" type="button">
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                                <span id="copyInviteLabel">Copy invite link</span>
-                            </button>
                             <button class="pill" id="rerollButton" type="button" hidden>
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                 <span id="rerollLabel">Reroll</span>
@@ -247,6 +266,17 @@
                                     <div class="bingo-card" id="bingoCard"></div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-stack-item" gs-id="host">
+                    <div class="grid-stack-item-content widget">
+                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span>Host controls</span><button class="widget-hide" type="button" data-hide aria-label="Hide host controls" title="Hide host controls"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+                        <div class="widget-body host-body">
+                            <button class="btn btn-primary start-round" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Start round</button>
+                            <button class="btn btn-quiet" id="lockRerollsButton" type="button" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> <span id="lockRerollsLabel">Lock rerolls</span></button>
+                            <button class="btn btn-quiet open-settings" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg> Room settings</button>
+                            <p class="host-status" id="rerollStatus"></p>
                         </div>
                     </div>
                 </div>

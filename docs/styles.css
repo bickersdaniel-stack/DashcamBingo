@@ -952,17 +952,6 @@ a.btn {
     color: var(--amber);
 }
 
-/* Together mode room: code and invite above the board, tabs in the sidebar */
-.room-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
-    margin-bottom: 12px;
-    padding: 0 4px;
-    font-size: 12px;
-    color: var(--text-muted);
-}
 .room-code {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 15px;
@@ -970,8 +959,11 @@ a.btn {
     letter-spacing: 0.15em;
     color: var(--heading);
 }
-.round-number {
+.widget-head .round-number {
     flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
 }
 .tabs {
     display: flex;
@@ -1303,12 +1295,6 @@ body.in-room .stage {
     cursor: grab;
     user-select: none;
 }
-.widget-head.room-head {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-muted);
-}
 .widget-grip {
     color: var(--text-faint);
 }
@@ -1411,6 +1397,73 @@ body.in-room .stage {
 .layout-toggle input {
     accent-color: var(--stamp);
 }
+/* The Room menu, beside your picture: invite, the host's video and round controls, layout, leaving */
+.room-button {
+    padding: 6px 12px;
+}
+.room-button .room-code {
+    font-size: 12px;
+}
+.room-panel {
+    width: min(340px, calc(100vw - 32px));
+}
+.invite-button {
+    justify-content: center;
+    width: 100%;
+}
+.room-panel .host-bar {
+    margin: 0;
+}
+.room-panel .host-bar .link-input {
+    flex-basis: 100%;
+}
+/* Once there's a video, the host's controls sit in its title bar */
+.video-tools {
+    flex: 1;
+    min-width: 0;
+}
+.video-tools:empty {
+    display: none;
+}
+.video-tools .host-bar {
+    gap: 6px;
+    margin: 0;
+    padding: 2px 0;
+}
+.video-tools .link-input, .video-tools .quality-select {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+.video-tools .btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    box-shadow: none;
+}
+.video-tools .quality-label {
+    font-size: 12px;
+}
+/* The host's own tile */
+.host-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+}
+.host-body .btn {
+    padding: 7px 14px;
+    font-size: 12px;
+}
+#lockRerollsButton[aria-pressed="true"] {
+    border-color: var(--amber);
+    color: var(--amber);
+}
+.host-status {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
 /* Narrow screens: one tile under another, each as tall as it needs, and no moving them about */
 @media (max-width: 899px) {
     .room-grid:not([hidden]) {
@@ -1430,9 +1483,10 @@ body.in-room .stage {
     }
     .room-grid > [gs-id="video"] { order: 1; }
     .room-grid > [gs-id="card"] { order: 2; }
-    .room-grid > [gs-id="players"] { order: 3; }
-    .room-grid > [gs-id="feed"] { order: 4; }
-    .room-grid > [gs-id="wins"] { order: 5; }
+    .room-grid > [gs-id="host"] { order: 3; }
+    .room-grid > [gs-id="players"] { order: 4; }
+    .room-grid > [gs-id="feed"] { order: 5; }
+    .room-grid > [gs-id="wins"] { order: 6; }
     .room-grid > .grid-stack-item > .ui-resizable-handle, .widget-grip, .layout-presets {
         display: none !important;
     }
@@ -2098,6 +2152,14 @@ body.in-room .stage {
     .bar-title {
         font-size: 16px;
     }
+    /* In a room the Room button joins your picture, so the title moves to the left to make space */
+    body.in-room .room-bar > .bar-side:first-child {
+        display: none;
+    }
+    body.in-room .bar-title {
+        position: static;
+        transform: none;
+    }
     .theme-label, .picker-label {
         display: none;
     }
@@ -2124,9 +2186,9 @@ body.in-room .stage {
         display: none;
     }
 }
-/* Phones: just your picture in the bar */
+/* Phones: just your picture and the room code in the bar */
 @media (max-width: 639px) {
-    .account-name {
+    .account-name, .room-word {
         display: none;
     }
 }

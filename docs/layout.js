@@ -1,12 +1,13 @@
 // The room's panels are tiles in a grid (gridstack, loaded by room.html): drag a title bar to move one,
-// drag an edge or corner to resize, x to hide. There are two arrangements, one for when there's a video and one
-// for when there isn't, each saved on this device. Narrow screens get a plain stack that can't be moved.
+// drag an edge or corner to resize, x to hide. There are separate arrangements for with and without a video,
+// and for the host (who also has a tile of their own), each saved on this device.
+// Narrow screens get a plain stack that can't be moved.
 import { load, save } from "./core.js";
 
 const $ = id => document.getElementById(id);
 const rows = 12;      // The built-in layouts are this many rows tall, and rows are sized so that fits the window
 const narrowPx = 900; // Below this width the tiles stack
-const names = { video: "Video", players: "Players", feed: "Feed", wins: "Winning cards" };
+const names = { video: "Video", host: "Host controls", players: "Players", feed: "Feed", wins: "Winning cards" };
 
 // Places on a 12-column grid. Hidden tiles keep a place for when they're shown again
 const at = (x, y, w, h) => ({ x, y, w, h });
@@ -23,13 +24,26 @@ export const presets = {
     }
 };
 
+// The host's tile goes under the video when there is one, or under the feed, which gives up the room
+function withHost({ items, hidden }, under) {
+    const above = items[under];
+    return { items: { ...items, [under]: { ...above, h: above.h - 2 }, host: at(above.x, above.y + above.h - 2, above.w, 2) }, hidden };
+}
+
 let grid = null;
 let mode = "plain";    // "video" when there's a video or stream to show, "plain" when there isn't
+let host = false;      // Whether this person is the host
 let applying = false;  // Moving tiles ourselves, which isn't a change to save
 
 const tiles = () => [...$("roomGrid").children];
 const tile = id => tiles().find(el => el.getAttribute("gs-id") === id);
 const narrow = () => innerWidth < narrowPx;
+const key = () => `layout.${mode}${host ? ".host" : ""}`;
+// Whether a tile belongs in this arrangement at all (as opposed to being hidden by choice)
+const belongs = id => (id !== "video" || mode === "video") && (id !== "host" || host);
+const builtIn = () => host
+    ? Object.fromEntries(Object.entries(presets[mode]).map(([name, preset]) => [name, withHost(preset, mode === "video" ? "video" : "feed")]))
+    : presets[mode];
 
 export function setUpLayout() {
     if (typeof GridStack === "undefined") return; // Its script didn't load: the tiles just sit one under another
@@ -50,10 +64,11 @@ export function setUpLayout() {
     useLayout("plain");
 }
 
-export function useLayout(newMode) {
+export function useLayout(newMode, isHost = false) {
     mode = newMode;
-    if (!grid) return void (tile("video").hidden = mode !== "video");
-    apply(layoutFor(mode));
+    host = isHost;
+    if (!grid) return tiles().forEach(el => el.hidden = !belongs(el.getAttribute("gs-id")));
+    apply(layoutFor());
     showMenu();
     fit();
 }
@@ -69,34 +84,34 @@ export function fit() {
 }
 
 // What this device saved for this arrangement, filling any gaps from the default
-function layoutFor(name) {
-    const fallback = presets[name].Default;
+function layoutFor() {
+    const fallback = builtIn().Default;
     let kept = null;
-    try { kept = JSON.parse(load(`layout.${name}`)); } catch (e) {}
+    try { kept = JSON.parse(load(key())); } catch (e) {}
     return { items: { ...fallback.items, ...kept?.items }, hidden: Array.isArray(kept?.hidden) ? kept.hidden : fallback.hidden };
 }
 
+// Takes every tile off and puts the shown ones back top-left first, so none is pushed aside by a tile
+// that's about to move out of its way
 function apply(layout) {
     applying = true;
     grid.batchUpdate();
-    for (const el of tiles()) {
-        const id = el.getAttribute("gs-id");
-        const shown = id === "card" || (!layout.hidden.includes(id) && (id !== "video" || mode === "video"));
-        el.hidden = !shown;
-        if (shown && !el.gridstackNode) grid.makeWidget(el, { ...layout.items[id], id }); // The id, or gridstack drops gs-id
-        else if (shown) grid.update(el, layout.items[id]);
-        else if (el.gridstackNode) grid.removeWidget(el, false, false);
-    }
+    grid.removeAll(false, false);
+    const shown = tiles().map(el => ({ el, id: el.getAttribute("gs-id") }))
+        .filter(({ id }) => id === "card" || (belongs(id) && !layout.hidden.includes(id)))
+        .map(tile => ({ ...tile, ...layout.items[tile.id] }));
+    for (const el of tiles()) el.hidden = !shown.some(tile => tile.el === el);
+    shown.sort((a, b) => a.y - b.y || a.x - b.x).forEach(({ el, ...place }) => grid.makeWidget(el, place)); // id included, or gridstack drops gs-id
     grid.batchUpdate(false);
     applying = false;
 }
 
 function remember() {
     if (narrow()) return; // The stack isn't a layout anyone chose
-    const items = layoutFor(mode).items;
+    const items = layoutFor().items;
     for (const { id, x, y, w, h } of grid.save(false)) items[id] = { x, y, w, h };
-    const hidden = tiles().map(el => el.getAttribute("gs-id")).filter(id => tile(id).hidden && (id !== "video" || mode === "video"));
-    save(`layout.${mode}`, JSON.stringify({ items, hidden }));
+    const hidden = tiles().map(el => el.getAttribute("gs-id")).filter(id => belongs(id) && tile(id).hidden);
+    save(key(), JSON.stringify({ items, hidden }));
 }
 
 function hide(id) {
@@ -110,23 +125,24 @@ function hide(id) {
 function show(id) {
     const el = tile(id);
     el.hidden = false;
-    grid.makeWidget(el, { ...layoutFor(mode).items[id], id }); // Back where it was; anything in the way moves down
+    grid.makeWidget(el, { ...layoutFor().items[id], id }); // Back where it was; anything in the way moves down
     remember();
     showMenu();
 }
 
 // The Room layout part of the account menu: the built-in layouts, and which tiles are showing
 function showMenu() {
-    $("layoutPresets").replaceChildren(...Object.keys(presets[mode]).map(name => {
+    const layouts = builtIn();
+    $("layoutPresets").replaceChildren(...Object.keys(layouts).map(name => {
         const button = Object.assign(document.createElement("button"), { type: "button", className: "pill", textContent: name });
         button.addEventListener("click", () => {
-            apply(presets[mode][name]);
+            apply(layouts[name]);
             remember();
             showMenu();
         });
         return button;
     }));
-    const ids = mode === "video" ? ["video", "players", "feed", "wins"] : ["players", "feed", "wins"];
+    const ids = Object.keys(names).filter(belongs);
     $("layoutToggles").replaceChildren(...ids.map(id => {
         const label = Object.assign(document.createElement("label"), { className: "layout-toggle" });
         const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: !tile(id).hidden });

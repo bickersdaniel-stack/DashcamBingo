@@ -84,9 +84,19 @@ function joinRoom() {
         socket.disconnect();
     }));
     socket.on("room:state", newState => {
+        const previousRound = state?.round.number;
         state = newState;
         videoSeenAt = Date.now();
         showRoom(socket);
+        // A new round while you're here: show how the last one went (not after a refresh or rejoin)
+        if (previousRound && state.round.number > previousRound && state.lastRound) showScoreboard(state.lastRound);
+    });
+    socket.on("room:host", hostId => {
+        if (!state) return;
+        state.hostId = hostId; // The host was away for a minute and someone else took over
+        showVideo(socket);
+        showPlayers();
+        showFeed();
     });
     socket.on("player:update", player => {
         if (!state) return;
@@ -222,7 +232,7 @@ async function startPlayer(socket, video) {
     };
     player = new YT.Player(holder, {
         videoId: video.id,
-        playerVars: { start: Math.floor(video.time), playsinline: 1, rel: 0 },
+        playerVars: { start: Math.floor(videoSecondsNow()), playsinline: 1, rel: 0 }, // A new host picks up where it's got to
         events: { onReady: report, onStateChange: report, onError: event => videoFailed(socket, video.id, event.data) }
     });
     reportTimer = setInterval(report, 1000);
@@ -262,9 +272,13 @@ function showNowPlaying() {
     const video = state.round.video;
     $("nowPlaying").hidden = !video || state.hostId === me.id;
     if ($("nowPlaying").hidden) return;
-    const seconds = video.time + (video.playing ? (Date.now() - videoSeenAt) / 1000 : 0);
     $("nowPlayingTitle").textContent = video.title || "the host's video";
-    $("nowPlayingTime").textContent = formatTime(Math.floor(seconds));
+    $("nowPlayingTime").textContent = formatTime(Math.floor(videoSecondsNow()));
+}
+
+function videoSecondsNow() {
+    const video = state.round.video;
+    return video.time + (video.playing ? (Date.now() - videoSeenAt) / 1000 : 0);
 }
 
 function showPlayers() {
@@ -288,6 +302,7 @@ function showFeed() {
         const names = listNames.format(ids.map(id => playerById(id).name));
         const text = el("span", "feed-text");
         if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
+        else if (event.type === "host") text.append(`👑 ${names} is now the host`);
         else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
 
         const avatars = el("span", "feed-avatars");
@@ -307,6 +322,24 @@ function showFeed() {
     });
     $("feedList").replaceChildren(...items);
     $("feedEmpty").hidden = items.length > 0;
+}
+
+function showScoreboard(summary) {
+    $("scoreboardTitle").textContent = `Round ${summary.number} results`;
+    $("scoreboardVideo").textContent = summary.videoTitle ?? "";
+    $("scoreboardVideo").hidden = !summary.videoTitle;
+    $("scoreList").replaceChildren(...summary.players.map((player, i) => {
+        const result = player.lines > 0
+            ? `🎉 BINGO${player.bingoAt !== null ? ` at ${formatTime(player.bingoAt)}` : ""}${player.lines > 1 ? ` · ${player.lines} lines` : ""}`
+            : player.oneAway ? "1 away" : `${player.marked}/24 marked`;
+        const row = el("li", player.lines > 0 ? "score winner" : "score");
+        row.append(el("span", "score-rank", String(i + 1)), avatar(player), el("span", "person-name", player.name),
+            el("span", "score-result", result), Object.assign(el("span", "wins", `🏆 ${player.wins}`), { title: "Wins so far" }));
+        return row;
+    }));
+    if (summary.players.length === 0) $("scoreList").append(el("li", "score", "Nobody marked anything."));
+    $("scoreboardClose").textContent = `On to round ${summary.number + 1}`;
+    if (!$("scoreboard").open) $("scoreboard").showModal();
 }
 
 // Someone else spotted a phrase that's on my card too: that square glows with their picture for 10 seconds

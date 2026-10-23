@@ -9,6 +9,7 @@ const maxRooms = 200; // shortcut: one cap for everyone stops endless room creat
 const spotMergeMs = 30 * 1000;
 const spotGapMs = 1000;
 const emptyRoomMs = 6 * 60 * 60 * 1000;
+const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
@@ -24,7 +25,10 @@ export function setupRooms(io) {
             let code;
             do code = Array.from({ length: 5 }, () => codeLetters[Math.floor(Math.random() * codeLetters.length)]).join("");
             while (rooms.has(code));
-            const room = { code, hostId: user.id, players: new Map(), connections: new Map(), round: null, nextEventId: 1, emptySince: Date.now() };
+            const room = {
+                code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
+                nextEventId: 1, emptySince: Date.now(), hostAwaySince: null
+            };
             startRound(room);
             rooms.set(code, room);
             reply({ code });
@@ -38,13 +42,15 @@ export function setupRooms(io) {
             socket.data.code = room.code;
             socket.join(room.code);
 
-            const player = room.players.get(user.id) ?? { id: user.id, wins: 0, lastSpotAt: 0 };
+            const player = room.players.get(user.id) ?? { id: user.id, wins: 0, lastSpotAt: 0, joinedAt: Date.now() };
             player.name = user.name;
             player.avatar = user.avatar;
             room.players.set(user.id, player);
             room.connections.set(user.id, (room.connections.get(user.id) ?? 0) + 1); // A second tab counts too
+            if (user.id === room.hostId) room.hostAwaySince = null;
             room.emptySince = null;
             if (!room.round.cards.has(user.id)) room.round.cards.set(user.id, dealCard()); // Rejoining keeps your card
+            checkHost(io, room); // The host may have been gone a while before anyone came back
 
             reply({ ok: true });
             socket.emit("room:state", stateFor(room, user.id));
@@ -80,6 +86,7 @@ export function setupRooms(io) {
             if (!room || room.hostId !== user.id) return;
             const videoId = videoIdPattern.test(data?.videoId) ? data.videoId : null;
             const start = Number.isFinite(data?.start) ? Math.min(Math.max(data.start, 0), maxVideoSeconds) : 0;
+            room.lastRound = roundSummary(room);
             startRound(room, videoId && { id: videoId, title: "", time: start, playing: false, reportedAt: Date.now() });
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
         });
@@ -110,6 +117,10 @@ export function setupRooms(io) {
             const left = room.connections.get(user.id) - 1;
             room.connections.set(user.id, left);
             if (left === 0) io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
+            if (left === 0 && user.id === room.hostId) {
+                room.hostAwaySince = Date.now();
+                setTimeout(() => checkHost(io, room), handoverMs + 100).unref();
+            }
             if ([...room.connections.values()].every(count => count === 0)) room.emptySince = Date.now();
         });
     });
@@ -178,6 +189,7 @@ function stateFor(room, userId) {
     return {
         code: room.code, hostId: room.hostId,
         round: { number: room.round.number, video: videoInfo(room.round.video) },
+        lastRound: room.lastRound,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
         card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines }
@@ -191,4 +203,41 @@ function videoTimeNow(video) {
 
 function videoInfo(video) {
     return video && { id: video.id, title: video.title, time: videoTimeNow(video), playing: video.playing };
+}
+
+// After the host has been gone a minute, whoever here joined the room first takes over (a refresh doesn't reset that)
+function checkHost(io, room) {
+    if (!room.hostAwaySince || Date.now() - room.hostAwaySince < handoverMs) return;
+    const next = [...room.players.values()]
+        .filter(player => player.id !== room.hostId && room.connections.get(player.id) > 0)
+        .sort((a, b) => a.joinedAt - b.joinedAt)[0];
+    if (!next) return; // Nobody here yet; the next person to join takes over
+    room.hostId = next.id;
+    room.hostAwaySince = null;
+    io.to(room.code).emit("room:host", room.hostId);
+    addEvent(io, room, { type: "host", userId: next.id });
+}
+
+// The round that just ended, best first: BINGOs in the order they happened, then whoever was closest
+function roundSummary(room) {
+    const firstWins = new Map();
+    for (const event of room.round.events) if (event.type === "win" && !firstWins.has(event.userId)) firstWins.set(event.userId, event);
+    const rows = [...room.players.values()].map(player => {
+        const card = room.round.cards.get(player.id);
+        const win = firstWins.get(player.id);
+        const lines = card?.bestLines ?? 0;
+        return {
+            id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, lines,
+            marked: card?.marked.size ?? 0, oneAway: card ? isOneAway(card.marked) : false, bingoAt: win?.videoTime ?? null,
+            order: lines > 0 ? (win?.id ?? Number.MAX_SAFE_INTEGER) : Infinity // A win that fell out of the feed still beats no win
+        };
+    });
+    return {
+        number: room.round.number,
+        videoTitle: room.round.video?.title || null,
+        players: rows
+            .filter(row => row.marked > 0 || room.connections.get(row.id) > 0) // Leave out people who weren't playing
+            .sort((a, b) => (a.order - b.order) || (b.oneAway - a.oneAway) || (b.marked - a.marked))
+            .map(({ order, ...row }) => row)
+    };
 }

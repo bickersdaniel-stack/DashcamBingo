@@ -923,6 +923,72 @@ button:focus-visible, .custom-colour:focus-within {
 .hosting .sidebar .bingo-cell {
     border-radius: 8px;
 }
+/* Results of the round that just ended */
+.scoreboard {
+    width: min(480px, calc(100vw - 32px));
+    box-sizing: border-box;
+    padding: 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: var(--text);
+    box-shadow: 0 25px 50px -12px var(--board-shadow);
+}
+.scoreboard::backdrop {
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+.scoreboard h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--heading);
+}
+.scoreboard-video {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.score-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 55vh;
+    margin: 16px 0 20px;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+.score {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-2);
+    font-size: 13px;
+}
+.score.winner {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.score-rank {
+    width: 18px;
+    font-weight: 800;
+    color: var(--text-faint);
+    text-align: center;
+}
+.score-result {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cell-text);
+    white-space: nowrap;
+}
+.scoreboard form {
+    display: flex;
+    justify-content: flex-end;
+}
 /* Someone else just spotted this one: glow with their picture in the corner */
 .bingo-cell.spotted {
     border-color: var(--stamp);

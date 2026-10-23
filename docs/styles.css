@@ -1690,7 +1690,7 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
 /* Admin page: suggestions, every card, and packs */
 .admin {
     width: 100%;
-    max-width: 64rem;
+    max-width: 80rem;
     margin: 0 auto;
     padding: 32px 16px 48px;
     box-sizing: border-box;
@@ -1729,8 +1729,26 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     border: 1px dashed var(--border-strong);
     border-radius: 10px;
 }
-.admin-tools .link-input, .admin-row .link-input {
+.admin-tools .link-input {
     flex: 1 1 200px;
+}
+/* Fixed widths for everything but the wording and description, so the rows line up as columns */
+.admin-row > .link-input {
+    flex: 1 1 0;
+    min-width: 9rem;
+}
+.admin-row > .link-input + .link-input {
+    flex-grow: 1.5;
+}
+.admin-row > .pack-select, .admin-row > .admin-stats {
+    flex: 0 0 9.5rem;
+    box-sizing: border-box;
+}
+.admin-row > .item-by {
+    flex: 0 0 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .admin-row .link-input, .admin-row .quality-select {
     padding: 7px 10px;
@@ -1744,9 +1762,6 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     font-size: 12px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-}
-.admin-stats {
-    min-width: 9em;
 }
 .check-label {
     display: inline-flex;
@@ -1798,8 +1813,31 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     font-weight: 700;
     color: var(--accent);
 }
-.user-tag.blocked, .btn.danger {
+.user-tag.tag-blocked, .btn.danger {
     color: var(--danger);
+}
+/* On a big enough screen the admin page fits the window: the heading, tabs, tools and page buttons stay put
+   and only the list scrolls. Phones scroll the whole page instead, since the tools take most of the height */
+@media (min-width: 700px) and (min-height: 560px) {
+    .admin {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 64px);
+        height: calc(100dvh - 64px);
+        padding-bottom: 16px;
+    }
+    .admin-panel:not([hidden]) {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+    }
+    .admin .item-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
 }
 
 /* Results of the round that just ended */

@@ -102,9 +102,7 @@ function showCards() {
             if (done(await api("DELETE", `/api/admin/cards/${card.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(text, description, pack, stats);
-        if (card.by) item.append(el("span", "item-by", `from ${card.by.name}`));
-        item.append(save, remove);
+        item.append(text, description, pack, stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
         return item;
     }));
 }
@@ -154,7 +152,7 @@ function showUsers() {
         winsLabel.append(wins);
         const saveWins = button("Save", "btn btn-primary", () => change({ wins: Number(wins.value) }, `Saved ${user.name}'s wins.`));
         showSaveWhenEdited(item, saveWins);
-        item.append(Object.assign(el("img", "avatar"), { src: user.avatar, alt: "" }), who, ...tags.map(tag => el("span", `user-tag ${tag.toLowerCase()}`, tag)),
+        item.append(Object.assign(el("img", "avatar"), { src: user.avatar, alt: "" }), who, ...tags.map(tag => el("span", `user-tag tag-${tag.toLowerCase()}`, tag)),
             winsLabel, saveWins, el("span", "admin-stats", `Suggested ${user.suggested} · ${user.approved} added`));
         if (!user.owner) {
             item.append(button(user.admin ? "Remove admin" : "Make admin", "btn btn-quiet",
@@ -206,11 +204,12 @@ function fillPackSelect(select, value) {
     return select;
 }
 
-// Save only shows once something in the row has changed
+// Save only shows once something in the row has changed; it keeps its space so the row doesn't shift
 function showSaveWhenEdited(item, save) {
-    save.hidden = true;
-    item.addEventListener("input", () => save.hidden = false);
-    item.addEventListener("change", () => save.hidden = false);
+    save.style.visibility = "hidden";
+    const show = () => save.style.visibility = "";
+    item.addEventListener("input", show);
+    item.addEventListener("change", show);
 }
 
 function input(value, maxLength, label) {

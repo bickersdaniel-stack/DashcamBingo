@@ -157,7 +157,7 @@ function showRoom(socket) {
         } else {
             marked.delete(index);
         }
-        socket.emit("card:mark", { round: state.round.number, index, marked: crossed });
+        socket.emit("card:mark", { round: state.round.id, index, marked: crossed });
         checkBingo();
     });
     marked.forEach(index => setCrossed($("bingoCard").children[index], true));

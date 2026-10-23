@@ -60,7 +60,7 @@ export function setupRooms(io) {
         socket.on("card:mark", data => {
             const room = rooms.get(socket.data.code);
             const { round, index, marked } = data ?? {};
-            if (!room || round !== room.round.number || !Number.isInteger(index) || index < 0 || index > 24 || index === 12 || typeof marked !== "boolean") return;
+            if (!room || round !== room.round.id || !Number.isInteger(index) || index < 0 || index > 24 || index === 12 || typeof marked !== "boolean") return;
             const card = room.round.cards.get(user.id);
             const player = room.players.get(user.id);
             if (card.marked.has(index) === marked) return;
@@ -86,8 +86,10 @@ export function setupRooms(io) {
             if (!room || room.hostId !== user.id) return;
             const videoId = videoIdPattern.test(data?.videoId) ? data.videoId : null;
             const start = Number.isFinite(data?.start) ? Math.min(Math.max(data.start, 0), maxVideoSeconds) : 0;
-            room.lastRound = roundSummary(room);
-            startRound(room, videoId && { id: videoId, title: "", time: start, playing: false, reportedAt: Date.now() });
+            // A round nobody has touched yet (like a new room's first) is replaced, keeping its number and skipping results
+            const untouched = room.round.events.length === 0 && [...room.round.cards.values()].every(card => card.marked.size === 0);
+            if (!untouched) room.lastRound = roundSummary(room);
+            startRound(room, videoId && { id: videoId, title: "", time: start, playing: false, reportedAt: Date.now() }, untouched);
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
         });
 
@@ -133,8 +135,10 @@ export function setupRooms(io) {
     }, 10 * 60 * 1000).unref();
 }
 
-function startRound(room, video = null) {
-    room.round = { number: (room.round?.number ?? 0) + 1, startedAt: Date.now(), video, cards: new Map(), events: [] };
+// The id changes every time, so marks meant for a replaced round can't land on the new cards
+function startRound(room, video = null, replace = false) {
+    const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
+    room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard());
 }
 
@@ -188,7 +192,7 @@ function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
     return {
         code: room.code, hostId: room.hostId,
-        round: { number: room.round.number, video: videoInfo(room.round.video) },
+        round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,

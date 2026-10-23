@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="bar-side">
+            <button id="themeButton" class="pill theme-button" type="button" title="Switch between System, Light and Dark"></button>
+            <span class="edition">AU Edition</span>
+        </div>
+        <h1 class="bar-title">Dashcam Bingo</h1>
+        <div class="bar-side">
+            <label for="colourButton" class="picker-label">Colour Picker:</label>
+            <div class="colour-menu">
+                <button id="colourButton" class="pill colour-pill" type="button" aria-haspopup="true" aria-expanded="false" title="Pick the colour for marked squares">
+                    <span class="colour-dot"></span>
+                    <span class="colour-code" id="colourCode">#22C55E</span>
+                </button>
+                <div class="colour-popover" id="colourPopover" hidden>
+                    <p class="swatch-label">Colours</p>
+                    <div class="swatches" id="presetSwatches"></div>
+                    <div id="recentSection" hidden>
+                        <p class="swatch-label">Recent</p>
+                        <div class="swatches" id="recentSwatches"></div>
+                    </div>
+                    <label class="custom-colour">
+                        <input type="color" id="colorPicker" value="#22c55e">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+                        Custom colour
+                    </label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="stage">
+            <div class="ambient-glow"></div>
+            <div class="board-wrap">
+                <div class="status-row">
+                    <span class="bingo-alert" id="bingoAlert" hidden>🎉 Bingo winner!</span>
+                </div>
+                <div id="bingoCardContainer">
+                    <div class="shot-title">Dashcam Bingo</div>
+                    <div class="bingo-card" id="bingoCard"></div>
+                </div>
+                <div class="actions">
+                    <button id="refreshButton" class="btn" type="button">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Refresh Card
+                    </button>
+                    <button id="clearButton" class="btn btn-quiet" type="button">Clear Marks</button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="sidebar">
+            <div class="sidebar-head">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                <h2>Your Winning Cards</h2>
+            </div>
+            <div class="win-list" id="gallery">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                    </div>
+                    <p class="empty-title">No winning rounds yet</p>
+                    <p class="empty-hint">Complete any row, column, or diagonal line to claim a winning card.</p>
+                </div>
+            </div>
+            <div class="sidebar-foot">
+                <span class="count" id="winCount">0 winning cards</span>
+                <button id="clearHistoryButton" class="link-button" type="button">Clear History</button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Load html2canvas from CDN for screenshot functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

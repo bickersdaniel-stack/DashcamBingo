@@ -29,12 +29,14 @@ app.set("trust proxy", 1); // Cloudflare Tunnel says the visit was over https, s
 app.use(session);
 app.use(auth);
 app.get("/healthz", (req, res) => res.send("ok"));
-// The page links its script and styles under /v/<version>/, so each deploy gets fresh copies
+// Pages link their script and styles under /v/<version>/, so each deploy gets fresh copies
 // (Cloudflare tells browsers to keep .js and .css for 4 hours, whatever this server says)
-app.get(["/", "/r/:code"], async (req, res) => {
-    const page = await readFile(`${docs}/room.html`, "utf8");
-    res.type("html").send(page.replace('"/styles.css"', `"/v/${version}/styles.css"`).replace('"/room.js"', `"/v/${version}/room.js"`));
-});
+const page = file => async (req, res) => {
+    const html = await readFile(`${docs}/${file}`, "utf8");
+    res.type("html").send(html.replace(/(href|src)="\/?(styles\.css|room\.js|app\.js)"/g, `$1="/v/${version}/$2"`));
+};
+app.get(["/", "/r/:code"], page("room.html"));
+app.get(["/solo", "/index.html"], page("index.html")); // The solo game, sharing this site's theme and colour
 const site = express.static(docs, { index: false }); // Only docs/ is public, never server code or .env
 app.use("/v/:version", site);
 app.use(site);

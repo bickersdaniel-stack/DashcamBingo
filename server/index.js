@@ -5,8 +5,9 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cookieSession from "cookie-session";
 import { Server } from "socket.io";
-import { auth } from "./auth.js";
-import { allPhrases } from "./store.js";
+import { auth, isAdmin } from "./auth.js";
+import { cards } from "./cards.js";
+import { cardsIn, defaultPacks, store } from "./store.js";
 import { suggestions } from "./suggestions.js";
 import { setupRooms } from "./rooms.js";
 
@@ -36,15 +37,21 @@ app.use((req, res, next) => {
 });
 app.use(auth);
 app.use(suggestions);
+app.use(cards);
 app.get("/healthz", (req, res) => res.send("ok"));
-app.get("/phrases.txt", (req, res) => res.type("text").send(allPhrases().join("\n"))); // The solo game here gets approved squares too
+// The solo game here deals from the packs that are on by default (or every card, if they hold too few for a card)
+app.get("/phrases.txt", (req, res) => {
+    const deck = cardsIn(defaultPacks());
+    res.type("text").send((deck.length >= 24 ? deck : store.cards).map(card => card.text).join("\n"));
+});
 // Pages link their script and styles under /v/<version>/, so each deploy gets fresh copies
 // (Cloudflare tells browsers to keep .js and .css for 4 hours, whatever this server says)
 const page = file => async (req, res) => {
     const html = await readFile(`${docs}/${file}`, "utf8");
-    res.type("html").send(html.replace(/(href|src)="\/?(styles\.css|room\.js|app\.js)"/g, `$1="/v/${version}/$2"`));
+    res.type("html").send(html.replace(/(href|src)="\/?(styles\.css|room\.js|app\.js|admin\.js)"/g, `$1="/v/${version}/$2"`));
 };
 app.get(["/", "/r/:code"], page("room.html"));
+app.get("/admin", (req, res, next) => isAdmin(req.session.user) ? next() : res.redirect("/"), page("admin.html"));
 app.get(["/solo", "/index.html"], page("index.html")); // The solo game, sharing this site's theme and colour
 app.get("/privacy", page("privacy.html"));
 const site = express.static(docs, { index: false }); // Only docs/ is public, never server code or .env

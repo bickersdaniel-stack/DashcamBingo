@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage cards · Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="bar-side">
+            <a class="pill together-link" href="/">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                Back to rooms
+            </a>
+        </div>
+        <h1 class="bar-title">Dashcam Bingo</h1>
+        <div class="bar-side"></div>
+    </header>
+
+    <main class="admin">
+        <h2>Manage cards</h2>
+        <div class="tabs" role="tablist">
+            <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="suggestionsPanel" id="suggestionsTab">Suggestions</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="cardsPanel" id="cardsTab">Cards</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="packsPanel">Packs</button>
+        </div>
+        <p class="email-message admin-message" id="adminMessage" role="status" hidden></p>
+
+        <section class="admin-panel" id="suggestionsPanel" role="tabpanel">
+            <p class="admin-hint">Approve to add a square to a pack. You can tidy the wording and description first.</p>
+            <ul class="item-list" id="pendingList"></ul>
+        </section>
+
+        <section class="admin-panel" id="cardsPanel" role="tabpanel" hidden>
+            <form class="admin-tools add" id="newCardForm">
+                <input class="link-input" id="newCardText" maxlength="60" placeholder="New card, e.g. Kangaroo on the road" autocomplete="off" aria-label="New card wording">
+                <input class="link-input" id="newCardDescription" maxlength="140" placeholder="Description (optional)" autocomplete="off" aria-label="New card description">
+                <select class="quality-select pack-select" id="newCardPack" aria-label="Pack for the new card"></select>
+                <button class="btn btn-primary" type="submit">Add card</button>
+            </form>
+            <div class="admin-tools">
+                <input class="link-input" id="cardSearch" type="search" placeholder="Search cards" autocomplete="off" aria-label="Search cards">
+                <select class="quality-select" id="cardPackFilter" aria-label="Show cards from"></select>
+                <select class="quality-select" id="cardSort" aria-label="Sort cards">
+                    <option value="az">A to Z</option>
+                    <option value="most">Most spotted</option>
+                    <option value="least">Least spotted</option>
+                </select>
+                <span class="admin-count" id="cardCount"></span>
+            </div>
+            <ul class="item-list" id="cardList"></ul>
+        </section>
+
+        <section class="admin-panel" id="packsPanel" role="tabpanel" hidden>
+            <p class="admin-hint">Hosts pick packs when they set up a room. Packs that are on by default start ticked, and the solo game uses them.</p>
+            <form class="admin-tools add" id="newPackForm">
+                <input class="link-input" id="newPackName" maxlength="30" placeholder="New pack name" autocomplete="off" aria-label="New pack name">
+                <input class="link-input" id="newPackDescription" maxlength="140" placeholder="Description (optional)" autocomplete="off" aria-label="New pack description">
+                <label class="check-label"><input type="checkbox" id="newPackOn"> On by default</label>
+                <button class="btn btn-primary" type="submit">Add pack</button>
+            </form>
+            <ul class="item-list" id="packList"></ul>
+        </section>
+    </main>
+
+    <script type="module" src="/admin.js"></script>
+</body>
+</html>

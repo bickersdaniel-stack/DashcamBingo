@@ -1446,26 +1446,6 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     background-color: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(2px);
 }
-/* Fills the page under the top bar so the header stays put */
-.panel-dialog.full[open] {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    inset: 64px 0 0;
-    z-index: 30;
-    width: auto;
-    height: auto;
-    max-width: none;
-    max-height: none;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-}
-.panel-dialog.full .item-list {
-    flex: 0 1 auto;
-    max-height: 28vh;
-}
 .panel-dialog h2 {
     margin: 0 0 6px;
     font-size: 20px;
@@ -1481,9 +1461,17 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
 .panel-dialog > .menu-label {
     margin: 18px 0 8px;
 }
+/* Wording and description each on their own row, then the button */
 .suggest-form {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+.suggest-form .link-input {
+    flex-basis: 100%;
+}
+.suggest-form .btn {
+    margin-left: auto;
 }
 .item-list {
     display: flex;
@@ -1515,18 +1503,10 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     min-width: 0;
     color: var(--text);
 }
-/* The wording box on its own row, then who suggested it and the buttons */
-.item.review .link-input {
-    flex: 1 1 100%;
-    padding: 7px 10px;
-    font-size: 13px;
-}
-.item.review .item-by {
-    flex: 1;
-}
-.item.review .btn {
-    padding: 7px 14px;
+.item-note {
+    flex-basis: 100%;
     font-size: 12px;
+    color: var(--text-muted);
 }
 .item-by {
     font-size: 11px;
@@ -1548,11 +1528,6 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     justify-content: flex-end;
     margin-top: 18px;
 }
-.panel-dialog.full > * {
-    width: min(56rem, 100%);
-    margin-left: auto;
-    margin-right: auto;
-}
 .phrase-list {
     display: flex;
     flex-wrap: wrap;
@@ -1568,11 +1543,220 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     font-size: 12px;
     color: var(--text);
 }
-.panel-dialog.full .phrase-list {
-    flex: 1;
-    min-height: 8rem;
+.phrase-list .phrase.has-note {
+    border-style: dashed;
+    cursor: help;
+}
+.phrase-list .phrase-pack {
+    flex-basis: 100%;
+    margin: 6px 0 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+/* Setting up a room: the video, which packs to deal from, and rerolls (Room settings reuses the same fields) */
+.lobby-setup {
+    max-width: 520px;
+    text-align: left;
+}
+.lobby-setup .setup-label, .room-options .setup-label {
+    display: block;
+    margin: 18px 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--heading);
+}
+.setup-label span {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-faint);
+}
+.lobby-setup .link-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.pack-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.pack-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--surface-2);
+    cursor: pointer;
+}
+.pack-choice:has(input:checked) {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.pack-choice input {
+    margin: 2px 0 0;
+    accent-color: var(--stamp);
+}
+.pack-words {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    font-size: 13px;
+    color: var(--text);
+}
+.pack-words strong {
+    color: var(--heading);
+}
+.pack-count {
+    font-size: 12px;
+    color: var(--text-faint);
+}
+.pack-description {
+    flex-basis: 100%;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.lobby-setup .pack-total, .room-options .pack-total {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.room-options .pack-total.error {
+    color: var(--amber);
+}
+.setup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+}
+.lobby-setup .lobby-error {
+    margin: 16px 0 0;
+}
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* A square with a description: a small i in the corner, and the description in a tip at the pointer */
+.bingo-cell.has-note {
+    -webkit-touch-callout: none; /* Holding shows the description, not the phone's own menu */
+}
+.bingo-cell.has-note::before {
+    content: "i";
+    position: absolute;
+    right: 5px;
+    bottom: 5px; /* The other corners show the marked dot and who else spotted it */
+    display: grid;
+    place-items: center;
+    width: 11px;
+    height: 11px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font: italic 700 8px/1 Georgia, serif;
+    opacity: 0.55;
+}
+.card-tip {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(260px, calc(100vw - 16px));
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background-color: var(--surface);
+    box-shadow: 0 12px 30px var(--shadow);
+    font-size: 13px;
+    line-height: 1.4;
+    pointer-events: none;
+}
+.card-tip[hidden] {
+    display: none;
+}
+.card-tip strong {
+    color: var(--heading);
+}
+.card-tip span {
+    color: var(--text-muted);
+}
+
+/* Admin page: suggestions, every card, and packs */
+.admin {
+    width: 100%;
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 32px 16px 48px;
+    box-sizing: border-box;
+}
+.admin h2 {
+    margin: 0 0 12px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--heading);
+}
+.admin .tabs {
+    margin-bottom: 16px;
+    padding: 0;
+}
+.admin .item-list {
     max-height: none;
-    align-content: start;
+    overflow: visible;
+}
+.admin-hint {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.admin-message {
+    margin: 0 0 12px;
+}
+.admin-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.admin-tools.add {
+    padding: 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+}
+.admin-tools .link-input, .admin-row .link-input {
+    flex: 1 1 200px;
+}
+.admin-row .link-input, .admin-row .quality-select {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+.admin-row .btn {
+    padding: 7px 14px;
+    font-size: 12px;
+}
+.admin-stats, .admin-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.admin-stats {
+    min-width: 9em;
+}
+.check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.check-label input {
+    accent-color: var(--stamp);
 }
 
 /* Results of the round that just ended */

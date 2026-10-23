@@ -143,8 +143,9 @@ function setStampColour(colour) {
     if (colourCode) colourCode.textContent = colour;
 }
 
-// Draws a card from the first 25 phrases (index 12 is the FREE square); onMark runs after each tap
-export function drawBoard(phrases, onMark) {
+// Draws a card from the first 25 phrases (index 12 is the FREE square); onMark runs after each tap.
+// notes are descriptions by the same index, for squares that need one
+export function drawBoard(phrases, onMark, notes = []) {
     bingoCard.replaceChildren();
 
     for (let i = 0; i < 25; i++) {
@@ -160,6 +161,11 @@ export function drawBoard(phrases, onMark) {
         } else {
             cell.textContent = phrases[i];
             cell.setAttribute("aria-pressed", "false");
+            if (notes[i]) {
+                cell.classList.add("has-note");
+                cell.dataset.note = notes[i];
+                cell.setAttribute("aria-description", notes[i]);
+            }
             cell.addEventListener("click", () => {
                 setCrossed(cell, !cell.classList.contains("crossed"));
                 onMark(i, cell.classList.contains("crossed"));

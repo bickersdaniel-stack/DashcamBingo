@@ -1,6 +1,6 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
-import { addWin, allPhrases, touchProfile } from "./store.js";
+import { addWin, cardsIn, countSpot, defaultPacks, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -27,7 +27,8 @@ export function setupRooms(io) {
             const room = {
                 code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
                 nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null,
-                rerolls: rerollsFrom(data?.rerolls) ?? 0
+                rerolls: rerollsFrom(data?.rerolls) ?? 0,
+                packs: packsFrom(data?.packs) ?? defaultPacks()
             };
             startRound(room, videoFrom(data));
             rooms.set(code, room);
@@ -50,7 +51,7 @@ export function setupRooms(io) {
             room.connections.set(user.id, (room.connections.get(user.id) ?? 0) + 1); // A second tab counts too
             if (user.id === room.hostId) room.hostAwaySince = null;
             room.emptySince = null;
-            if (!room.round.cards.has(user.id)) room.round.cards.set(user.id, dealCard()); // Rejoining keeps your card
+            if (!room.round.cards.has(user.id)) room.round.cards.set(user.id, dealCard(room)); // Rejoining keeps your card
             checkHost(io, room); // The host may have been gone a while before anyone came back
 
             reply({ ok: true });
@@ -68,6 +69,7 @@ export function setupRooms(io) {
 
             if (marked) {
                 card.marked.add(index);
+                countSpot(card.ids[index], 1);
                 spot(io, room, player, card.phrases[index]);
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
@@ -77,7 +79,9 @@ export function setupRooms(io) {
                 }
             } else {
                 card.marked.delete(index);
+                countSpot(card.ids[index], -1);
                 unspot(io, room, player, card.phrases[index]);
+                if (card.bestLines > 0 && countLines(card.marked) === 0) unwin(io, room, player, card);
             }
             io.to(room.code).emit("player:update", playerInfo(room, player));
         });
@@ -102,11 +106,21 @@ export function setupRooms(io) {
             io.to(room.code).emit("rerolls:update", n);
         });
 
+        // Which packs the next cards come from; cards already dealt stay as they are
+        socket.on("host:packs", data => {
+            const room = rooms.get(socket.data.code);
+            if (!room || room.hostId !== user.id) return;
+            const packs = packsFrom(data?.packs);
+            if (!packs) return;
+            room.packs = packs;
+            io.to(room.code).emit("packs:update", packs);
+        });
+
         socket.on("card:reroll", data => {
             const room = rooms.get(socket.data.code);
             const card = room?.round.cards.get(user.id);
             if (!room || data?.round !== room.round.id || !canReroll(room, card)) return;
-            room.round.cards.set(user.id, Object.assign(dealCard(), { rerollsUsed: card.rerollsUsed + 1 }));
+            room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1 }));
             socket.emit("room:state", stateFor(room, user.id));
             io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
         });
@@ -230,19 +244,49 @@ function startRound(room, video = null, replace = false) {
     video = continueVideo(room.round?.video, video); // Same dashcam clip, next bingo: keep watching from here
     const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
     room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
-    for (const id of room.players.keys()) room.round.cards.set(id, dealCard());
+    for (const id of room.players.keys()) room.round.cards.set(id, dealCard(room));
 }
 
-// 24 random phrases around FREE in the middle
-function dealCard() {
-    const deck = allPhrases(); // Including approved suggestions
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
+// 24 cards from the room's packs around FREE in the middle. The words are copied, so editing a card
+// mid-round doesn't change squares people are looking at; each card counts as dealt for the stats
+function dealCard(room) {
+    const deck = cardsIn(room.packs);
+    const picked = pickCards(deck.length >= 24 ? deck : store.cards); // A pack was emptied or deleted mid-room
+    for (const card of picked) card.dealt++;
+    save();
+    picked.splice(12, 0, null);
+    return {
+        ids: picked.map(card => card?.id ?? null),
+        phrases: picked.map(card => card?.text ?? "FREE"),
+        notes: picked.map(card => card?.description ?? ""),
+        marked: new Set(), bestLines: 0, rerollsUsed: 0
+    };
+}
+
+// A third each from the most spotted, the middle and the least spotted cards, so every card gets a fair mix.
+// Cards dealt fewer than 10 times go in at random places, since their numbers don't mean much yet
+export function pickCards(cards, random = Math.random) {
+    const ranked = cards.filter(card => card.dealt >= 10).sort((a, b) => b.spotted / b.dealt - a.spotted / a.dealt);
+    for (const card of cards.filter(card => card.dealt < 10)) ranked.splice(Math.floor(random() * (ranked.length + 1)), 0, card);
+    const third = Math.floor(ranked.length / 3);
+    const tiers = [ranked.slice(0, third), ranked.slice(third, third * 2), ranked.slice(third * 2)];
+    return shuffle(tiers.flatMap(tier => shuffle(tier, random).slice(0, 8)), random);
+}
+
+function shuffle(list, random = Math.random) {
+    const out = [...list];
+    for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
     }
-    const cardPhrases = deck.slice(0, 25);
-    cardPhrases[12] = "FREE";
-    return { phrases: cardPhrases, marked: new Set(), bestLines: 0, rerollsUsed: 0 };
+    return out;
+}
+
+// The packs a host picked, if they exist and hold enough cards to fill a card
+export function packsFrom(value) {
+    if (!Array.isArray(value)) return null;
+    const ids = [...new Set(value)].filter(id => store.packs.some(pack => pack.id === id));
+    return cardsIn(ids).length >= 24 ? ids : null;
 }
 
 export function rerollsFrom(value) {
@@ -276,6 +320,17 @@ function unspot(io, room, player, phrase) {
     io.to(room.code).emit("event", event);
 }
 
+// Unmarking until no line is left takes back this round's BINGO and the win on their profile
+function unwin(io, room, player, card) {
+    player.wins = removeWin(player.id);
+    card.bestLines = 0;
+    for (const event of room.round.events) {
+        if (event.type !== "win" || event.userId !== player.id || event.undone) continue;
+        event.undone = true;
+        io.to(room.code).emit("event", event);
+    }
+}
+
 function addEvent(io, room, event) {
     const now = Date.now();
     const video = room.round.video;
@@ -301,13 +356,13 @@ function playerInfo(room, player) {
 function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
     return {
-        code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0,
+        code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0, packs: room.packs,
         round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
-        card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
+        card: { phrases: card.phrases, notes: card.notes, marked: [...card.marked], bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 
@@ -339,13 +394,13 @@ function checkHost(io, room) {
 }
 
 // The round that just ended, best first: BINGOs in the order they happened, then whoever was closest
-function roundSummary(room) {
+export function roundSummary(room) {
     const firstWins = new Map();
-    for (const event of room.round.events) if (event.type === "win" && !firstWins.has(event.userId)) firstWins.set(event.userId, event);
+    for (const event of room.round.events) if (event.type === "win" && !event.undone && !firstWins.has(event.userId)) firstWins.set(event.userId, event);
     const rows = [...room.players.values()].map(player => {
         const card = room.round.cards.get(player.id);
         const win = firstWins.get(player.id);
-        const lines = card?.bestLines ?? 0;
+        const lines = card ? countLines(card.marked) : 0; // Lines still marked at the end, so an unmarked line doesn't count
         return {
             id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, lines,
             marked: card?.marked.size ?? 0, oneAway: card ? isOneAway(card.marked) : false, bingoAt: win?.videoTime ?? null,

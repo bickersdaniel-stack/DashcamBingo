@@ -74,7 +74,7 @@ function showSignIn() {
 }
 
 function show(...ids) {
-    for (const id of ["signedOut", "lobby", "roomGone", "game", "sidebar"]) $(id).hidden = !ids.includes(id);
+    for (const id of ["signedOut", "lobby", "setup", "roomGone", "game", "sidebar"]) $(id).hidden = !ids.includes(id);
 }
 
 function connect() {
@@ -88,22 +88,29 @@ function connect() {
 function showLobby() {
     show("lobby");
     const socket = connect();
-    const showError = message => {
-        $("lobbyError").textContent = message;
-        $("lobbyError").hidden = false;
+    const showError = (message, id = "lobbyError") => {
+        $(id).textContent = message;
+        $(id).hidden = false;
     };
 
-    $("createForm").addEventListener("submit", event => {
+    $("setupButton").addEventListener("click", async () => {
+        await fillRoomOptions(null, 0);
+        show("setup");
+        $("createLink").focus();
+    });
+    $("setupBack").addEventListener("click", () => show("lobby"));
+    $("setup").addEventListener("submit", event => {
         event.preventDefault();
         const text = $("createLink").value.trim();
         const video = text ? parseYouTubeLink(text) : null;
-        if (text && !video) return showError("That doesn't look like a YouTube link. Leave it empty to add a video later.");
+        if (text && !video) return showError("That doesn't look like a YouTube link. Leave it empty to add a video later.", "setupError");
+        if (!showPackTotal()) return;
         $("createButton").disabled = true;
-        const payload = { rerolls: Number($("createRerolls").value) };
+        const payload = { rerolls: Number($("roomRerolls").value), packs: chosenPacks() };
         if (video) Object.assign(payload, { videoId: video.id, start: video.start });
         socket.timeout(5000).emit("room:create", payload, (timedOut, result) => {
             if (result?.code) return location.assign(`/r/${result.code}`);
-            showError(result?.error ?? "Couldn't reach the server. Try again.");
+            showError(result?.error ?? "Couldn't reach the server. Try again.", "setupError");
             $("createButton").disabled = false;
         });
     });
@@ -188,7 +195,9 @@ function joinRoom() {
         if (!state) return;
         state.rerolls = rerolls;
         showReroll();
-        if (state.hostId === me.id) $("hostRerolls").value = String(rerolls);
+    });
+    socket.on("packs:update", packs => {
+        if (state) state.packs = packs;
     });
     socket.on("rtc:signal", ({ from, data }) => {
         if (shareStream && data?.type === "hello") return sendStream(socket, from);
@@ -228,7 +237,20 @@ function joinRoom() {
         applyQuality();
         applyCaptureQuality();
     });
-    $("hostRerolls").addEventListener("change", () => socket.emit("host:rerolls", { rerolls: Number($("hostRerolls").value) }));
+    $("settingsButton").addEventListener("click", async () => {
+        $("settingsForm").prepend($("roomOptions"));
+        await fillRoomOptions(state.packs, state.rerolls ?? 0);
+        $("settingsDialog").showModal();
+    });
+    $("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
+    $("settingsForm").addEventListener("submit", event => {
+        event.preventDefault();
+        if (!showPackTotal()) return;
+        socket.emit("host:packs", { packs: chosenPacks() });
+        socket.emit("host:rerolls", { rerolls: Number($("roomRerolls").value) });
+        $("settingsDialog").close();
+    });
+    setUpCardTips();
     $("rerollButton").addEventListener("click", () => socket.emit("card:reroll", { round: state.round.id }));
     $("shareButton").hidden = !navigator.mediaDevices?.getDisplayMedia; // Phones can't share their screen
     $("shareButton").addEventListener("click", () => shareStream ? stopSharing(socket) : startSharing(socket));
@@ -264,10 +286,9 @@ function showRoom(socket) {
         socket.emit("card:mark", { round: state.round.id, index, marked: crossed });
         checkBingo();
         showReroll();
-    });
+    }, state.card.notes);
     marked.forEach(index => setCrossed($("bingoCard").children[index], true));
     $("bingoAlert").hidden = countLines(marked) === 0;
-    if (state.hostId === me.id) $("hostRerolls").value = String(state.rerolls ?? 0);
     showReroll();
     showVideo(socket);
     showPlayers();
@@ -736,7 +757,7 @@ function showFeed() {
         const avatars = el("span", "feed-avatars");
         avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
         const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
-        if (still && still.length === 0) item.classList.add("undone");
+        if ((still && still.length === 0) || event.undone) item.classList.add("undone");
         // The host can click a moment from this video to watch it again, from 5 seconds before
         const replayable = playerVideoId !== null && event.videoId === playerVideoId;
         const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
@@ -875,7 +896,7 @@ function welcome() {
     $("onboarding").showModal();
 }
 
-// Suggested squares: anyone signed in can suggest one; admins approve, reword, reject or later remove them
+// Suggested squares: anyone signed in can suggest one, with a description if it needs one. Admins review them on /admin
 function setUpSuggestions() {
     const statusNames = { pending: "Waiting", approved: "Added ✓", rejected: "Not this time", removed: "Taken off" };
     const message = (id, text, ok) => {
@@ -884,9 +905,14 @@ function setUpSuggestions() {
         $(id).hidden = !text;
     };
 
-    const showPhrases = async id => {
-        const text = await fetch("/phrases.txt").then(r => r.text());
-        $(id).replaceChildren(...text.split("\n").map(s => s.trim()).filter(Boolean).map(phrase => el("span", "phrase", phrase)));
+    // Every card, grouped by pack; hovering one shows its description
+    const showPhrases = async () => {
+        const { data } = await api("GET", "/api/cards");
+        $("suggestPhrases").replaceChildren(...data.packs.flatMap(pack => {
+            const cards = data.cards.filter(card => card.pack === pack.id);
+            return cards.length ? [el("p", "phrase-pack", pack.name), ...cards.map(card =>
+                Object.assign(el("span", card.description ? "phrase has-note" : "phrase", card.text), { title: card.description }))] : [];
+        }));
     };
     const showMine = async () => {
         const { data } = await api("GET", "/api/suggestions");
@@ -894,70 +920,133 @@ function setUpSuggestions() {
             if (!s) return el("li", "item empty", "None yet.");
             const item = el("li", "item");
             item.append(el("span", "item-text", s.text), el("span", `item-status ${s.status}`, statusNames[s.status]));
+            if (s.description) item.append(el("span", "item-note", s.description));
             return item;
         }));
     };
     $("suggestButton").addEventListener("click", async () => {
         setMenuOpen(false);
         message("suggestMessage", "", true);
-        await Promise.all([showMine(), showPhrases("suggestPhrases")]);
+        await Promise.all([showMine(), showPhrases()]);
         $("suggestDialog").showModal();
         $("suggestText").focus();
     });
     $("suggestForm").addEventListener("submit", async event => {
         event.preventDefault();
-        const result = await api("POST", "/api/suggestions", { text: $("suggestText").value });
+        const result = await api("POST", "/api/suggestions", { text: $("suggestText").value, description: $("suggestDescription").value });
         message("suggestMessage", result.ok ? "Thanks! It's waiting for approval." : result.data.error, result.ok);
         if (!result.ok) return;
-        $("suggestText").value = "";
+        $("suggestText").value = $("suggestDescription").value = "";
         showMine();
     });
 
     if (!me.admin) return;
-    $("reviewButton").hidden = false;
-    const showReview = async () => {
-        const { data } = await api("GET", "/api/admin/suggestions");
-        $("reviewLabel").textContent = data.pending.length ? `Review suggestions (${data.pending.length})` : "Review suggestions";
-        $("pendingList").replaceChildren(...(data.pending.length ? data.pending : [null]).map(s => {
-            if (!s) return el("li", "item empty", "Nothing waiting. 🎉");
-            const item = el("li", "item review");
-            const text = Object.assign(el("input", "link-input"), { value: s.text, maxLength: 60, ariaLabel: "Square wording" });
-            const decide = action => async () => {
-                const result = await api("POST", `/api/admin/suggestions/${s.id}`, { action, text: text.value });
-                message("reviewMessage", result.ok ? "" : result.data.error, result.ok);
-                if (result.ok) showReview();
-            };
-            const approve = Object.assign(el("button", "btn btn-primary", "Approve"), { type: "button", onclick: decide("approve") });
-            const reject = Object.assign(el("button", "btn btn-quiet", "Reject"), { type: "button", onclick: decide("reject") });
-            item.append(text, el("span", "item-by", `from ${s.by.name}`), approve, reject);
-            return item;
-        }));
-        $("approvedList").replaceChildren(...(data.approved.length ? data.approved : [null]).map(square => {
-            if (!square) return el("li", "item empty", "None yet.");
-            const item = el("li", "item");
-            const remove = Object.assign(el("button", "link-button", "Remove"), {
-                type: "button",
-                onclick: async () => {
-                    if (!confirm(`Take "${square.text}" off the cards?`)) return;
-                    await api("DELETE", `/api/admin/approved/${square.id}`);
-                    showReview();
-                }
-            });
-            item.append(el("span", "item-text", square.text), el("span", "item-by", `from ${square.by.name}`), remove);
-            return item;
-        }));
-        await showPhrases("reviewPhrases");
+    $("manageLink").hidden = false;
+    api("GET", "/api/admin/suggestions").then(({ data }) => { // The waiting count on the menu
+        if (data.pending?.length) $("manageLabel").textContent = `Manage cards (${data.pending.length} waiting)`;
+    });
+}
+
+// The packs and rerolls fields, used by the setup screen and by the host's Room settings
+let packInfo = []; // Each pack with how many cards it holds
+
+async function fillRoomOptions(chosen, rerolls) {
+    const { data } = await api("GET", "/api/cards");
+    packInfo = data.packs ?? [];
+    $("packChoices").replaceChildren(...packInfo.map(pack => {
+        const choice = el("label", "pack-choice");
+        const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : pack.on });
+        const words = el("span", "pack-words");
+        words.append(el("strong", "", pack.name), el("span", "pack-count", `${pack.count} card${pack.count === 1 ? "" : "s"}`));
+        if (pack.description) words.append(el("span", "pack-description", pack.description));
+        choice.append(box, words);
+        return choice;
+    }));
+    $("packChoices").onchange = showPackTotal;
+    $("roomRerolls").value = String(rerolls);
+    showPackTotal();
+}
+
+const chosenPacks = () => [...$("packChoices").querySelectorAll("input:checked")].map(box => box.value);
+
+// A card has 24 squares, so Create room and Save wait until the ticked packs hold that many
+function showPackTotal() {
+    const total = packInfo.filter(pack => chosenPacks().includes(pack.id)).reduce((sum, pack) => sum + pack.count, 0);
+    const enough = total >= 24;
+    $("packTotal").textContent = enough ? `${total} cards to deal from` : `Only ${total} cards. Pick packs with at least 24.`;
+    $("packTotal").classList.toggle("error", !enough);
+    document.querySelectorAll(".needs-cards").forEach(button => button.disabled = !enough);
+    return enough;
+}
+
+// Squares with a description show it at the pointer: hover with a mouse, or press and hold on a touch screen
+const holdMs = 2000;
+
+function setUpCardTips() {
+    const card = $("bingoCard");
+    const tip = $("cardTip");
+    let timer = null;
+    let start = null;          // Where a touch began, so moving it cancels the hold
+    let swallowClick = false;  // Lifting the finger after a hold isn't a tap
+    const hide = () => {
+        clearTimeout(timer);
+        tip.hidden = true;
     };
-    $("reviewButton").addEventListener("click", async () => {
-        setMenuOpen(false);
-        message("reviewMessage", "", true);
-        await showReview();
-        if (!$("reviewDialog").open) $("reviewDialog").show();
+    const showAt = (cell, x, y) => {
+        tip.replaceChildren(el("strong", "", cell.textContent), el("span", "", cell.dataset.note));
+        tip.hidden = false;
+        const { width, height } = tip.getBoundingClientRect();
+        tip.style.left = `${Math.min(Math.max(8, x - width / 2), innerWidth - width - 8)}px`;
+        tip.style.top = `${y - height - 14 < 8 ? y + 18 : y - height - 14}px`; // Above the pointer, or below near the top
+    };
+
+    card.addEventListener("pointerover", event => {
+        const cell = event.target.closest(".has-note");
+        if (event.pointerType !== "mouse" || !cell) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => showAt(cell, event.clientX, event.clientY), 400);
     });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && $("reviewDialog").open && !$("suggestDialog").open) $("reviewDialog").close();
+    card.addEventListener("pointermove", event => {
+        if (event.pointerType === "mouse") {
+            const cell = event.target.closest(".has-note");
+            if (cell && !tip.hidden) showAt(cell, event.clientX, event.clientY);
+        } else if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
+            clearTimeout(timer);
+            start = null;
+        }
     });
-    showReview(); // Fills in the waiting count on the menu
+    card.addEventListener("pointerout", event => {
+        if (event.pointerType === "mouse" && event.target.closest(".has-note")) hide();
+    });
+    card.addEventListener("pointerdown", event => {
+        const cell = event.target.closest(".has-note");
+        if (event.pointerType === "mouse" || !cell) return;
+        start = { x: event.clientX, y: event.clientY };
+        timer = setTimeout(() => {
+            showAt(cell, start.x, start.y);
+            swallowClick = true;
+        }, holdMs);
+    });
+    for (const type of ["pointerup", "pointercancel"]) {
+        card.addEventListener(type, event => {
+            if (event.pointerType === "mouse" || !start) return;
+            clearTimeout(timer);
+            start = null;
+        });
+    }
+    // Capturing, so the square's own click (which marks it) never runs
+    card.addEventListener("click", event => {
+        if (!swallowClick) return;
+        swallowClick = false;
+        event.stopPropagation();
+    }, true);
+    card.addEventListener("contextmenu", event => event.target.closest(".has-note") && event.preventDefault());
+    // The next touch anywhere closes it
+    document.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" || tip.hidden) return;
+        swallowClick = false;
+        hide();
+    }, true);
 }
 
 async function api(method, url, body) {

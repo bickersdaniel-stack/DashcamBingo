@@ -59,10 +59,10 @@
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
                             Suggest a square
                         </button>
-                        <button class="menu-item" id="reviewButton" type="button" hidden>
+                        <a class="menu-item" id="manageLink" href="/admin" hidden>
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <span id="reviewLabel">Review suggestions</span>
-                        </button>
+                            <span id="manageLabel">Manage cards</span>
+                        </a>
                         <button class="menu-item" id="leaveButton" type="button" hidden>
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
                             Leave room
@@ -112,29 +112,14 @@
                     </div>
                 </div>
                 <div class="lobby-options">
-                    <form class="lobby-card" id="createForm">
+                    <div class="lobby-card">
                         <h3>
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             Host a room
                         </h3>
-                        <p>Paste the YouTube video you'll watch, or add one later.</p>
-                        <input class="link-input" id="createLink" placeholder="YouTube link (optional)" autocomplete="off" spellcheck="false" aria-label="YouTube link for the first round">
-                        <label class="quality-label">Rerolls
-                            <select class="quality-select" id="createRerolls" aria-label="Rerolls per round">
-                                <option value="0">Off</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5</option>
-                                <option value="6">6</option>
-                                <option value="7">7</option>
-                                <option value="8">8</option>
-                                <option value="9">9</option>
-                            </select>
-                        </label>
-                        <button class="btn btn-primary" id="createButton" type="submit">Create room</button>
-                    </form>
+                        <p>Pick the video and which cards to play with, then send your mates the link.</p>
+                        <button class="btn btn-primary" id="setupButton" type="button">Set up a room</button>
+                    </div>
                     <form class="lobby-card" id="joinForm">
                         <h3>
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
@@ -155,6 +140,36 @@
                 </div>
                 <p class="lobby-error" id="lobbyError" hidden></p>
             </div>
+            <form class="lobby lobby-setup" id="setup" hidden>
+                <h2>Set up your room</h2>
+                <p>You can change the packs and rerolls later from Room settings.</p>
+                <label class="setup-label" for="createLink">YouTube video <span>Optional, you can add one later</span></label>
+                <input class="link-input" id="createLink" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false">
+                <!-- The host's Room settings dialog borrows these same fields -->
+                <div class="room-options" id="roomOptions">
+                    <p class="setup-label">Packs</p>
+                    <div class="pack-choices" id="packChoices"></div>
+                    <p class="pack-total" id="packTotal" role="status"></p>
+                    <label class="setup-label" for="roomRerolls">Rerolls per round <span>A fresh card before you mark anything</span></label>
+                    <select class="quality-select" id="roomRerolls">
+                        <option value="0">Off</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                    </select>
+                </div>
+                <p class="lobby-error" id="setupError" hidden></p>
+                <div class="setup-actions">
+                    <button class="btn btn-quiet" id="setupBack" type="button">Back</button>
+                    <button class="btn btn-primary needs-cards" id="createButton" type="submit">Create room</button>
+                </div>
+            </form>
             <div class="lobby" id="roomGone" hidden>
                 <h2 id="roomGoneTitle">Room not found</h2>
                 <p id="roomGoneText"></p>
@@ -173,20 +188,7 @@
                         <option value="1080">1080p</option>
                     </select>
                 </label>
-                <label class="quality-label">Rerolls
-                    <select class="quality-select" id="hostRerolls" aria-label="Rerolls per round">
-                        <option value="0">Off</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="7">7</option>
-                        <option value="8">8</option>
-                        <option value="9">9</option>
-                    </select>
-                </label>
+                <button class="btn btn-quiet" id="settingsButton" type="button">Room settings</button>
                 <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
                 <p class="share-status" id="shareStatus" hidden></p>
                 <p class="host-note" id="hostNote" hidden>
@@ -292,6 +294,7 @@
         <p>Seen something in dashcam videos that should be on the cards? Once it's approved, it turns up on new cards.</p>
         <form class="suggest-form" id="suggestForm">
             <input class="link-input" id="suggestText" maxlength="60" placeholder="e.g. Kangaroo on the road" autocomplete="off" aria-label="Your square">
+            <input class="link-input" id="suggestDescription" maxlength="140" placeholder="Description, if it needs one (e.g. must be alive)" autocomplete="off" aria-label="Description, if it needs one">
             <button class="btn btn-primary" type="submit">Suggest</button>
         </form>
         <p class="email-message" id="suggestMessage" role="status" hidden></p>
@@ -302,17 +305,19 @@
         <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>
     </dialog>
 
-    <dialog class="panel-dialog full" id="reviewDialog" aria-labelledby="reviewTitle">
-        <h2 id="reviewTitle">Suggested squares</h2>
-        <p>Approve to add a square to new cards. You can tidy the wording first.</p>
-        <p class="email-message" id="reviewMessage" role="status" hidden></p>
-        <ul class="item-list" id="pendingList"></ul>
-        <p class="menu-label">On the cards</p>
-        <div class="phrase-list" id="reviewPhrases"></div>
-        <p class="menu-label">Added from suggestions</p>
-        <ul class="item-list" id="approvedList"></ul>
-        <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>
+    <dialog class="panel-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+        <h2 id="settingsTitle">Room settings</h2>
+        <p>Changes start with the next round or reroll. Cards already dealt stay as they are.</p>
+        <form id="settingsForm">
+            <!-- The setup screen's packs and rerolls fields move in here -->
+            <div class="setup-actions">
+                <button class="btn btn-quiet" id="settingsCancel" type="button">Cancel</button>
+                <button class="btn btn-primary needs-cards" type="submit">Save</button>
+            </div>
+        </form>
     </dialog>
+
+    <div class="card-tip" id="cardTip" role="tooltip" hidden></div>
 
     <dialog class="scoreboard" id="scoreboard" aria-labelledby="scoreboardTitle">
         <h2 id="scoreboardTitle"></h2>

@@ -1,26 +1,34 @@
-// Players suggest new squares; admins approve, edit, reject, or later remove them
+// Players suggest new squares; admins approve them into a pack (tidying the wording first if they like) or reject them
 import { randomUUID } from "node:crypto";
 import express, { Router } from "express";
 import { isAdmin } from "./auth.js";
-import { allPhrases, save, store } from "./store.js";
+import { defaultPacks, save, store } from "./store.js";
 
 export const suggestions = Router();
-const json = express.json({ limit: "2kb" }); // JSON only, so other sites can't post here with a plain form
+export const json = express.json({ limit: "2kb" }); // JSON only, so other sites can't post here with a plain form
 const lastSuggestion = new Map(); // User id -> time, so nobody can fire off dozens
 
-const signedIn = (req, res, next) => req.session.user ? next() : res.status(401).json({ error: "Sign in first." });
-const adminOnly = (req, res, next) => isAdmin(req.session.user) ? next() : res.status(403).json({ error: "Admins only." });
+export const signedIn = (req, res, next) => req.session.user ? next() : res.status(401).json({ error: "Sign in first." });
+export const adminOnly = (req, res, next) => isAdmin(req.session.user) ? next() : res.status(403).json({ error: "Admins only." });
 
-// One space between words, at most 60 characters
-const tidy = text => String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
+// One space between words, no control characters
+export const tidy = text => String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
 const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 
+// ignoreId skips the card or suggestion being edited, so keeping its own wording isn't a clash
 function problemWith(text, ignoreId) {
     if (text.length < 3) return "Make it at least 3 characters.";
     if (text.length > 60) return "Keep it to 60 characters so it fits on a square.";
-    if (allPhrases().some(phrase => same(phrase, text))) return "That one's already on the cards.";
+    if (store.cards.some(card => card.id !== ignoreId && same(card.text, text))) return "That one's already on the cards.";
     if (store.suggestions.some(s => s.status === "pending" && s.id !== ignoreId && same(s.text, text))) return "Someone's already suggested that.";
     return null;
+}
+
+const descriptionProblem = description => description.length > 140 ? "Keep the description to 140 characters." : null;
+
+export function cardProblem({ text, description, pack }, ignoreId) {
+    return problemWith(text, ignoreId) ?? descriptionProblem(description)
+        ?? (store.packs.some(p => p.id === pack) ? null : "Pick a pack.");
 }
 
 suggestions.get("/api/suggestions", signedIn, (req, res) => {
@@ -30,54 +38,44 @@ suggestions.get("/api/suggestions", signedIn, (req, res) => {
 suggestions.post("/api/suggestions", signedIn, json, (req, res) => {
     const user = req.session.user;
     const text = tidy(req.body?.text);
-    const problem = problemWith(text);
+    const description = tidy(req.body?.description);
+    const problem = problemWith(text) ?? descriptionProblem(description);
     if (problem) return res.status(400).json({ error: problem });
     if (store.suggestions.filter(s => s.by.id === user.id && s.status === "pending").length >= 5) {
         return res.status(429).json({ error: "You have 5 waiting already. Wait for those to be looked at." });
     }
     if (Date.now() - (lastSuggestion.get(user.id) ?? 0) < 10_000) return res.status(429).json({ error: "Give it a few seconds between suggestions." });
     lastSuggestion.set(user.id, Date.now());
-    const suggestion = { id: randomUUID(), text, by: { id: user.id, name: user.name }, at: Date.now(), status: "pending" };
+    const suggestion = { id: randomUUID(), text, description, by: { id: user.id, name: user.name }, at: Date.now(), status: "pending" };
     store.suggestions.push(suggestion);
     save();
     res.json(suggestion);
 });
 
 suggestions.get("/api/admin/suggestions", adminOnly, (req, res) => {
-    res.json({
-        pending: store.suggestions.filter(s => s.status === "pending"),
-        approved: [...store.approved].reverse()
-    });
+    res.json({ pending: store.suggestions.filter(s => s.status === "pending") });
 });
 
-// Approve (optionally with tidied-up wording) or reject a suggestion
+// Approve into a pack (optionally with tidied-up wording and description) or reject a suggestion
 suggestions.post("/api/admin/suggestions/:id", adminOnly, json, (req, res) => {
     const suggestion = store.suggestions.find(s => s.id === req.params.id && s.status === "pending");
     if (!suggestion) return res.status(404).json({ error: "That suggestion has already been dealt with." });
     if (req.body?.action === "reject") {
         suggestion.status = "rejected";
     } else if (req.body?.action === "approve") {
-        const text = req.body.text === undefined ? suggestion.text : tidy(req.body.text);
-        const problem = problemWith(text, suggestion.id);
+        const card = {
+            text: req.body.text === undefined ? suggestion.text : tidy(req.body.text),
+            description: req.body.description === undefined ? suggestion.description ?? "" : tidy(req.body.description),
+            pack: String(req.body.pack ?? defaultPacks()[0] ?? store.packs[0].id)
+        };
+        const problem = cardProblem(card, suggestion.id);
         if (problem) return res.status(400).json({ error: problem });
-        suggestion.status = "approved";
-        suggestion.text = text;
-        store.approved.push({ id: suggestion.id, text, by: suggestion.by, at: Date.now() });
+        Object.assign(suggestion, { status: "approved", text: card.text, description: card.description });
+        store.cards.push({ id: suggestion.id, ...card, by: suggestion.by, at: Date.now(), dealt: 0, spotted: 0 });
     } else {
         return res.status(400).json({ error: "Approve or reject." });
     }
     suggestion.decidedAt = Date.now();
     save();
     res.json(suggestion);
-});
-
-// Take an approved square back off the cards
-suggestions.delete("/api/admin/approved/:id", adminOnly, (req, res) => {
-    const index = store.approved.findIndex(square => square.id === req.params.id);
-    if (index === -1) return res.status(404).json({ error: "Already removed." });
-    store.approved.splice(index, 1);
-    const suggestion = store.suggestions.find(s => s.id === req.params.id);
-    if (suggestion) suggestion.status = "removed";
-    save();
-    res.json({ ok: true });
 });

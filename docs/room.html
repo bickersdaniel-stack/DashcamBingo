@@ -110,9 +110,16 @@
                         <input class="code-input" id="joinCode" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
                         <button class="btn" type="submit">Join room</button>
                     </form>
+                    <div class="lobby-card">
+                        <h3>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            Play solo
+                        </h3>
+                        <p>Just you today? Grab a card and play on your own, no room needed.</p>
+                        <a class="btn" href="/solo">Play on your own</a>
+                    </div>
                 </div>
                 <p class="lobby-error" id="lobbyError" hidden></p>
-                <p class="lobby-solo">Just you today? <a href="/solo">Play on your own</a></p>
             </div>
             <div class="lobby" id="roomGone" hidden>
                 <h2 id="roomGoneTitle">Room not found</h2>

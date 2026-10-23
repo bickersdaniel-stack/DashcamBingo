@@ -140,6 +140,18 @@ button:focus-visible, .custom-colour:focus-within {
 .theme-button .icon {
     color: var(--accent);
 }
+/* The solo game's link to together mode: just the icon until there's room for the words */
+.together-link {
+    text-decoration: none;
+}
+.together-link .icon {
+    color: var(--accent);
+}
+@media (max-width: 1023px) {
+    .together-label {
+        display: none;
+    }
+}
 .status-dot {
     width: 8px;
     height: 8px;
@@ -764,7 +776,7 @@ a.btn {
 }
 /* The greeting screen: say hello, then host a room or join one */
 .lobby-wide {
-    max-width: 760px;
+    max-width: 960px;
     text-align: left;
 }
 .lobby-hello {
@@ -782,8 +794,13 @@ a.btn {
 }
 .lobby-options {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 16px;
+}
+/* Host, join and solo side by side when there's room, stacked otherwise */
+@media (min-width: 900px) {
+    .lobby-options {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 .lobby-card {
     display: flex;
@@ -1370,6 +1387,12 @@ a.btn {
 @media (max-width: 639px) {
     .top-bar {
         padding: 0 16px;
+    }
+    .bar-side {
+        gap: 6px;
+    }
+    .together-link {
+        padding: 6px 8px;
     }
     .bar-title {
         font-size: 16px;

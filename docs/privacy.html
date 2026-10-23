@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy · Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main class="layout">
+        <section class="stage">
+            <article class="lobby privacy">
+                <h2>Privacy</h2>
+                <p>Dashcam Bingo is a game for mates to play while watching dashcam videos together. It keeps as little about you as it can.</p>
+                <h3>When you sign in</h3>
+                <p>With <strong>Discord</strong> or <strong>Google</strong>, we keep your name, your profile picture and an ID for your account. We don't see your password or your contacts, and we don't keep the access Discord or Google gives us.</p>
+                <p>With an <strong>email link</strong>, your address is used once to send the link (through our email service, Resend). We keep the name you type and a scrambled ID made from your address; the address itself isn't stored or shown to anyone.</p>
+                <p>A cookie keeps you signed in for up to a year. Signing out removes it.</p>
+                <h3>While you play</h3>
+                <p>Rooms, cards and marks live only while the room is open. Other players in your room see your name, picture, marks and wins. The video stream, if the host shares one, goes straight between browsers.</p>
+                <h3>Suggested squares</h3>
+                <p>If you suggest a square, we keep it with your name so the admin can review it. Approved squares appear on everyone's cards.</p>
+                <h3>On your device</h3>
+                <p>Your theme and colour are saved in your own browser. Nothing is sold or shared for advertising.</p>
+                <a class="btn" href="/">Back to Dashcam Bingo</a>
+            </article>
+        </section>
+    </main>
+</body>
+</html>

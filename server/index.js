@@ -6,6 +6,8 @@ import express from "express";
 import cookieSession from "cookie-session";
 import { Server } from "socket.io";
 import { auth } from "./auth.js";
+import { allPhrases } from "./store.js";
+import { suggestions } from "./suggestions.js";
 import { setupRooms } from "./rooms.js";
 
 for (const key of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SESSION_SECRET", "PUBLIC_URL"]) {
@@ -21,14 +23,21 @@ const session = cookieSession({
     secret: SESSION_SECRET,
     secure: PUBLIC_URL.startsWith("https:"),
     sameSite: "lax",
-    maxAge: 30 * 24 * 60 * 60 * 1000
+    maxAge: 365 * 24 * 60 * 60 * 1000
 });
 
 const app = express();
 app.set("trust proxy", 1); // Cloudflare Tunnel says the visit was over https, so secure cookies work
 app.use(session);
+app.use((req, res, next) => {
+    // Remember signed-in people for a year from their latest visit: changing this once a day re-sends the cookie
+    if (req.session.user) req.session.day = Math.floor(Date.now() / 86_400_000);
+    next();
+});
 app.use(auth);
+app.use(suggestions);
 app.get("/healthz", (req, res) => res.send("ok"));
+app.get("/phrases.txt", (req, res) => res.type("text").send(allPhrases().join("\n"))); // The solo game here gets approved squares too
 // Pages link their script and styles under /v/<version>/, so each deploy gets fresh copies
 // (Cloudflare tells browsers to keep .js and .css for 4 hours, whatever this server says)
 const page = file => async (req, res) => {
@@ -37,6 +46,7 @@ const page = file => async (req, res) => {
 };
 app.get(["/", "/r/:code"], page("room.html"));
 app.get(["/solo", "/index.html"], page("index.html")); // The solo game, sharing this site's theme and colour
+app.get("/privacy", page("privacy.html"));
 const site = express.static(docs, { index: false }); // Only docs/ is public, never server code or .env
 app.use("/v/:version", site);
 app.use(site);

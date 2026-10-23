@@ -1,4 +1,4 @@
-// Together mode: Discord sign-in, then rooms where everyone's marks and wins show up live
+// Together mode: sign in (Discord, Google or an email link), then rooms where everyone's marks and wins show up live
 import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, setCrossed, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { countLines } from "./shared/lines.js";
@@ -6,7 +6,9 @@ import { parseYouTubeLink } from "./youtube.js";
 
 const $ = id => document.getElementById(id);
 const code = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})$/)?.[1].toUpperCase();
-const me = await fetch("/api/me").then(response => response.ok ? response.json() : null);
+const meResponse = await fetch("/api/me");
+const me = meResponse.ok ? await meResponse.json() : null;
+const signInOptions = me ? {} : await meResponse.json().catch(() => ({})); // Which ways to sign in are set up
 const listNames = new Intl.ListFormat("en-AU", { type: "conjunction" });
 let state = null;         // What the server last said about the room
 let marked = new Set();   // My marked squares
@@ -30,19 +32,36 @@ if (me) {
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
     setUpAccountMenu();
+    setUpSuggestions();
     welcome();
 }
 
 if (!me) {
-    if (code) {
-        $("signInText").textContent = `Sign in with Discord to join room ${code}. Only your Discord name and picture are used.`;
-        $("signInLink").href = `/auth/discord?next=/r/${code}`;
-    }
-    show("signedOut");
+    showSignIn();
 } else if (code) {
     joinRoom();
 } else {
     showLobby();
+}
+
+function showSignIn() {
+    const next = code ? `?next=/r/${code}` : ""; // Back to the room link afterwards
+    if (code) $("signInText").textContent = `Sign in to join room ${code}. Only your name and picture are used.`;
+    $("signInLink").href = `/auth/discord${next}`;
+    $("googleLink").href = `/auth/google${next}`;
+    $("googleLink").hidden = !signInOptions.google;
+    $("emailForm").hidden = !signInOptions.email;
+    $("emailForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const email = $("emailAddress").value.trim();
+        const result = await api("POST", "/auth/email", { email, name: $("emailName").value, next: code ? `/r/${code}` : undefined });
+        $("emailMessage").textContent = result.ok
+            ? `Check your inbox: a sign-in link is on its way to ${email}. It works once, for 15 minutes.`
+            : result.data.error;
+        $("emailMessage").classList.toggle("error", !result.ok);
+        $("emailMessage").hidden = false;
+    });
+    show("signedOut");
 }
 
 function show(...ids) {
@@ -552,12 +571,14 @@ function leaveRoomView(socket, message) {
     show("roomGone");
 }
 
+function setMenuOpen(open) {
+    $("accountPanel").hidden = !open;
+    $("accountButton").setAttribute("aria-expanded", open);
+}
+
 // Your picture opens the menu; clicking elsewhere or pressing Escape closes it
 function setUpAccountMenu() {
-    const setOpen = open => {
-        $("accountPanel").hidden = !open;
-        $("accountButton").setAttribute("aria-expanded", open);
-    };
+    const setOpen = setMenuOpen;
     $("accountButton").addEventListener("click", () => setOpen($("accountPanel").hidden));
     document.addEventListener("click", event => {
         // The path, not the target: the theme button redraws itself, so its clicked icon is gone by now
@@ -596,4 +617,91 @@ function welcome() {
     }));
     showChoices();
     $("onboarding").showModal();
+}
+
+// Suggested squares: anyone signed in can suggest one; admins approve, reword, reject or later remove them
+function setUpSuggestions() {
+    const statusNames = { pending: "Waiting", approved: "Added ✓", rejected: "Not this time", removed: "Taken off" };
+    const message = (id, text, ok) => {
+        $(id).textContent = text;
+        $(id).classList.toggle("error", !ok);
+        $(id).hidden = !text;
+    };
+
+    const showMine = async () => {
+        const { data } = await api("GET", "/api/suggestions");
+        $("mySuggestions").replaceChildren(...(data.length ? data : [null]).map(s => {
+            if (!s) return el("li", "item empty", "None yet.");
+            const item = el("li", "item");
+            item.append(el("span", "item-text", s.text), el("span", `item-status ${s.status}`, statusNames[s.status]));
+            return item;
+        }));
+    };
+    $("suggestButton").addEventListener("click", async () => {
+        setMenuOpen(false);
+        message("suggestMessage", "", true);
+        await showMine();
+        $("suggestDialog").showModal();
+        $("suggestText").focus();
+    });
+    $("suggestForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const result = await api("POST", "/api/suggestions", { text: $("suggestText").value });
+        message("suggestMessage", result.ok ? "Thanks! It's waiting for approval." : result.data.error, result.ok);
+        if (!result.ok) return;
+        $("suggestText").value = "";
+        showMine();
+    });
+
+    if (!me.admin) return;
+    $("reviewButton").hidden = false;
+    const showReview = async () => {
+        const { data } = await api("GET", "/api/admin/suggestions");
+        $("reviewLabel").textContent = data.pending.length ? `Review suggestions (${data.pending.length})` : "Review suggestions";
+        $("pendingList").replaceChildren(...(data.pending.length ? data.pending : [null]).map(s => {
+            if (!s) return el("li", "item empty", "Nothing waiting. 🎉");
+            const item = el("li", "item review");
+            const text = Object.assign(el("input", "link-input"), { value: s.text, maxLength: 60, ariaLabel: "Square wording" });
+            const decide = action => async () => {
+                const result = await api("POST", `/api/admin/suggestions/${s.id}`, { action, text: text.value });
+                message("reviewMessage", result.ok ? "" : result.data.error, result.ok);
+                if (result.ok) showReview();
+            };
+            const approve = Object.assign(el("button", "btn btn-primary", "Approve"), { type: "button", onclick: decide("approve") });
+            const reject = Object.assign(el("button", "btn btn-quiet", "Reject"), { type: "button", onclick: decide("reject") });
+            item.append(text, el("span", "item-by", `from ${s.by.name}`), approve, reject);
+            return item;
+        }));
+        $("approvedList").replaceChildren(...(data.approved.length ? data.approved : [null]).map(square => {
+            if (!square) return el("li", "item empty", "None yet.");
+            const item = el("li", "item");
+            const remove = Object.assign(el("button", "link-button", "Remove"), {
+                type: "button",
+                onclick: async () => {
+                    if (!confirm(`Take "${square.text}" off the cards?`)) return;
+                    await api("DELETE", `/api/admin/approved/${square.id}`);
+                    showReview();
+                }
+            });
+            item.append(el("span", "item-text", square.text), el("span", "item-by", `from ${square.by.name}`), remove);
+            return item;
+        }));
+    };
+    $("reviewButton").addEventListener("click", async () => {
+        setMenuOpen(false);
+        message("reviewMessage", "", true);
+        await showReview();
+        $("reviewDialog").showModal();
+    });
+    showReview(); // Fills in the waiting count on the menu
+}
+
+async function api(method, url, body) {
+    const response = await fetch(url, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await response.json().catch(() => ({ error: "Something went wrong. Try again." }));
+    return { ok: response.ok, data };
 }

@@ -1,9 +1,7 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
-import { readFileSync } from "node:fs";
 import { countLines, isOneAway } from "../docs/shared/lines.js";
+import { allPhrases } from "./store.js";
 
-const phrases = readFileSync(new URL("../docs/phrases.txt", import.meta.url), "utf8")
-    .split("\n").map(line => line.trim()).filter(line => line !== "");
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
 const spotMergeMs = 30 * 1000;
@@ -205,7 +203,7 @@ function startRound(room, video = null, replace = false) {
 
 // 24 random phrases around FREE in the middle
 function dealCard() {
-    const deck = [...phrases];
+    const deck = allPhrases(); // Including approved suggestions
     for (let i = deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];

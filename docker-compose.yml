@@ -6,3 +6,6 @@ services:
     # Only this box can reach it; the minisv2 tunnel sends bingo.dkb.lol here
     ports:
       - "127.0.0.1:3030:3000"
+    # Suggested and approved squares live here, so they survive rebuilds
+    volumes:
+      - ./data:/app/data

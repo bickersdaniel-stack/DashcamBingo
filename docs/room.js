@@ -186,20 +186,12 @@ function showVideo(socket) {
     showNowPlaying();
 }
 
-// A host playing a video gets it large on the left with the feed under it, and their card on the right
+// A host playing a video gets it large on the left, and their card above the tabs on the right
 function arrange(hosting) {
     document.body.classList.toggle("hosting", hosting);
     $("videoColumn").hidden = !hosting;
-    $("feedTab").hidden = hosting;
-    if (hosting) {
-        $("sidebar").prepend($("game"));
-        $("videoColumn").append($("feedPanel"));
-    } else {
-        $("stage").append($("game"));
-        $("winsPanel").before($("feedPanel"));
-    }
-    const selected = document.querySelector('.tab[aria-selected="true"]');
-    selectTab(hosting && selected === $("feedTab") ? $("playersTab") : selected);
+    if (hosting) $("sidebar").prepend($("game"));
+    else $("stage").append($("game"));
 }
 
 function selectTab(tab) {
@@ -207,7 +199,6 @@ function selectTab(tab) {
         other.setAttribute("aria-selected", other === tab);
         $(other.getAttribute("aria-controls")).hidden = other !== tab;
     });
-    if (document.body.classList.contains("hosting")) $("feedPanel").hidden = false; // It sits under the video instead
 }
 
 async function startPlayer(socket, video) {

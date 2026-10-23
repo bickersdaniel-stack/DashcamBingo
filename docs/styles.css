@@ -900,9 +900,6 @@ button:focus-visible, .custom-colour:focus-within {
     height: 100%;
     border: 0;
 }
-.video-column .feed {
-    padding: 8px 0;
-}
 .hosting .host-bar {
     max-width: none;
 }
@@ -1044,6 +1041,14 @@ button:focus-visible, .custom-colour:focus-within {
     .hosting .sidebar {
         width: 400px;
         overflow-y: auto;
+    }
+    /* The video area never scrolls: the video is as big as fits under the link box */
+    .hosting .stage {
+        overflow-y: hidden;
+    }
+    .hosting .video-frame {
+        width: min(100%, calc((100vh - 240px) * 16 / 9));
+        margin: 0 auto;
     }
     .hosting .tab-panel {
         flex: none;

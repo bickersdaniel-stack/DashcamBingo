@@ -1,6 +1,6 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
-import { allPhrases } from "./store.js";
+import { addWin, allPhrases, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -42,7 +42,8 @@ export function setupRooms(io) {
             socket.data.code = room.code;
             socket.join(room.code);
 
-            const player = room.players.get(user.id) ?? { id: user.id, wins: 0, lastSpotAt: 0, joinedAt: Date.now() };
+            const wins = touchProfile(user).wins;
+            const player = room.players.get(user.id) ?? { id: user.id, wins, lastSpotAt: 0, joinedAt: Date.now() };
             player.name = user.name;
             player.avatar = user.avatar;
             room.players.set(user.id, player);
@@ -70,12 +71,13 @@ export function setupRooms(io) {
                 spot(io, room, player, card.phrases[index]);
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
-                    if (card.bestLines === 0) player.wins++; // One win per round, for the first line
+                    if (card.bestLines === 0) player.wins = addWin(user.id); // One win per round, for the first line; kept on their profile
                     card.bestLines = lines;
                     addEvent(io, room, { type: "win", userId: user.id, lines });
                 }
             } else {
-                card.marked.delete(index); // Unmarking isn't announced
+                card.marked.delete(index);
+                unspot(io, room, player, card.phrases[index]);
             }
             io.to(room.code).emit("player:update", playerInfo(room, player));
         });
@@ -258,10 +260,20 @@ function spot(io, room, player, phrase) {
     if (now - player.lastSpotAt < spotGapMs) return; // At most one spot a second each
     player.lastSpotAt = now;
     const recent = room.round.events.findLast(event => event.type === "spot" && event.phrase === phrase && now - event.at < spotMergeMs);
-    if (!recent) return addEvent(io, room, { type: "spot", phrase, userIds: [player.id] });
-    if (recent.userIds.includes(player.id)) return;
-    recent.userIds.push(player.id);
+    if (!recent) return addEvent(io, room, { type: "spot", phrase, userIds: [player.id], cleared: [] });
+    const cleared = recent.cleared ?? [];
+    if (recent.userIds.includes(player.id) && !cleared.includes(player.id)) return;
+    recent.cleared = cleared.filter(id => id !== player.id);
+    if (!recent.userIds.includes(player.id)) recent.userIds.push(player.id);
     io.to(room.code).emit("event", recent);
+}
+
+function unspot(io, room, player, phrase) {
+    const event = room.round.events.findLast(e =>
+        e.type === "spot" && e.phrase === phrase && e.userIds.includes(player.id) && !(e.cleared ?? []).includes(player.id));
+    if (!event) return;
+    event.cleared = [...(event.cleared ?? []), player.id];
+    io.to(room.code).emit("event", event);
 }
 
 function addEvent(io, room, event) {

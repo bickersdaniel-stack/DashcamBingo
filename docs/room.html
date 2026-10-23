@@ -37,6 +37,7 @@
                         <img class="avatar my-avatar" alt="">
                         <div>
                             <strong class="my-name"></strong>
+                            <span class="my-wins" id="myWins"></span>
                             <span>Signed in with Discord</span>
                         </div>
                     </div>
@@ -162,8 +163,8 @@
 
             <form class="host-bar" id="hostBar" hidden>
                 <input class="link-input" id="videoLink" placeholder="Paste a YouTube link, or leave empty for no video" autocomplete="off" spellcheck="false" aria-label="YouTube link">
-                <button class="btn" type="submit">Start round</button>
-                <button class="btn btn-quiet" id="changeVideoButton" type="button">Change video</button>
+                <button class="btn" type="submit">Change video</button>
+                <button class="btn btn-quiet" id="startRoundButton" type="button">Start round</button>
                 <label class="quality-label">Quality
                     <select class="quality-select" id="streamQuality" aria-label="Stream quality">
                         <option value="auto">Auto</option>
@@ -199,7 +200,10 @@
                     <video id="liveVideo" autoplay playsinline muted hidden></video>
                     <div class="stream-controls" id="streamControls" hidden>
                         <button class="pill sound-button" id="soundButton" type="button">🔊 Turn on sound</button>
-                        <input class="stream-volume" id="streamVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Stream volume">
+                        <label class="stream-volume-wrap">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"/></svg>
+                            <input class="stream-volume" id="streamVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Stream volume">
+                        </label>
                     </div>
                 </div>
             </div>

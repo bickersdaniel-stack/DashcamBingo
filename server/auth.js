@@ -2,6 +2,7 @@
 // are kept; access tokens are thrown away and email addresses are never shown to other players.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
+import { store } from "./store.js";
 
 const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, PUBLIC_URL, SESSION_SECRET } = process.env;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Dashcam Bingo <bingo@dkb.lol>";
@@ -14,7 +15,10 @@ export const auth = Router();
 export const isAdmin = user => !!user && adminIds.includes(user.id);
 
 auth.get("/api/me", (req, res) => {
-    if (req.session.user) return res.json({ ...req.session.user, admin: isAdmin(req.session.user) });
+    if (req.session.user) return res.json({
+        ...req.session.user, admin: isAdmin(req.session.user),
+        wins: store.profiles[req.session.user.id]?.wins ?? 0
+    });
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up
 });
 

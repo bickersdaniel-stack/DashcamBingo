@@ -17,6 +17,7 @@ const pulses = new Map(); // Square index -> timer, for squares someone else jus
 let videoSeenAt = 0;      // When the video's time last arrived, to count on from
 let player = null;        // The host's YouTube player
 let playerVideoId = null;
+let playerFailedId = null; // Embed-blocked clip; don't keep recreating the player
 let reportTimer = null;
 let youTube = null;       // YouTube's player script, loaded once when the host first needs it
 // The live stream goes straight from the host's browser to each viewer's (WebRTC); the server only introduces them
@@ -38,6 +39,7 @@ if (me) {
     $("account").hidden = false;
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
+    showMyWins(me.wins);
     setUpAccountMenu();
     setUpSuggestions();
     welcome();
@@ -158,6 +160,7 @@ function joinRoom() {
         const i = state.players.findIndex(p => p.id === player.id);
         if (i === -1) state.players.push(player);
         else state.players[i] = player;
+        if (player.id === me.id) showMyWins(player.wins);
         showPlayers();
     });
     socket.on("event", event => {
@@ -166,7 +169,7 @@ function joinRoom() {
         if (i === -1) state.events.push(event);
         else state.events[i] = event; // Someone else spotted the same thing
         showFeed();
-        if (event.type === "spot") pulse(event);
+        if (event.type === "spot" && !(event.cleared ?? []).length) pulse(event);
     });
     socket.on("video:update", video => {
         if (!state) return;
@@ -204,18 +207,18 @@ function joinRoom() {
         event.preventDefault();
         const video = readVideoLink();
         if (video === false) return;
+        if (!video) return showHostMessage("Paste a YouTube link first.");
+        $("hostNote").hidden = true;
+        socket.emit("host:setVideo", { videoId: video.id, start: video.start });
+    });
+    $("startRoundButton").addEventListener("click", () => {
+        const video = readVideoLink();
+        if (video === false) return;
         const untouched = state.events.length === 0 && state.players.every(player => player.marked === 0);
         if (!untouched && !confirm(`Start a new round${video ? " with this video" : " without a video"}? Everyone gets a fresh card.`)) return;
         $("hostNote").hidden = true;
         socket.emit("host:newRound", video ? { videoId: video.id, start: video.start } : {});
         if (video && !shareStream) startSharing(socket); // Browser still shows the picker the first time
-    });
-    $("changeVideoButton").addEventListener("click", () => {
-        const video = readVideoLink();
-        if (video === false) return;
-        if (!video) return showHostMessage("Paste a YouTube link first.");
-        $("hostNote").hidden = true;
-        socket.emit("host:setVideo", { videoId: video.id, start: video.start });
     });
     const savedQuality = load("streamQuality");
     if (qualities[savedQuality]) $("streamQuality").value = savedQuality;
@@ -354,7 +357,7 @@ function setSidebarMin(min) {
 
 function clearSidebarPopStyle() {
     document.querySelectorAll("#sidebar .tab-panel").forEach(panel => {
-        panel.style.width = panel.style.left = panel.style.top = "";
+        panel.style.width = panel.style.left = panel.style.top = panel.style.bottom = "";
     });
 }
 
@@ -366,7 +369,8 @@ function placeSidebarPop() {
     const width = Math.min(380, innerWidth - 24);
     panel.style.width = `${width}px`;
     panel.style.left = `${Math.max(12, box.right - width)}px`;
-    panel.style.top = `${Math.min(box.bottom + 8, innerHeight - 120)}px`;
+    panel.style.top = "auto";
+    panel.style.bottom = `${innerHeight - box.top + 8}px`;
 }
 
 function setUpSidebarMin() {
@@ -388,6 +392,8 @@ function setUpSidebarMin() {
 }
 
 async function startPlayer(socket, video) {
+    if (playerFailedId === video.id) return;
+    if (playerFailedId && playerFailedId !== video.id) playerFailedId = null;
     if (playerVideoId === video.id) { // Keeps playing through a reconnect
         scalePlayer();
         applyQuality();
@@ -409,7 +415,9 @@ async function startPlayer(socket, video) {
     const YT = await youTube;
     if (playerVideoId !== video.id) return; // Another round started while the script loaded
 
-    const { width, height } = playerSize();
+    const frame = $("videoFrame");
+    const width = frame.clientWidth || 640;
+    const height = frame.clientHeight || 360;
     const holder = document.createElement("div");
     $("playerSlot").replaceChildren(holder);
     const report = () => {
@@ -422,14 +430,19 @@ async function startPlayer(socket, video) {
     player = new YT.Player(holder, {
         videoId: video.id,
         width, height,
-        playerVars: { start: Math.floor(videoSecondsNow()), playsinline: 1, rel: 0 }, // A new host picks up where it's got to
+        host: "https://www.youtube-nocookie.com",
+        playerVars: { start: Math.floor(videoSecondsNow()), playsinline: 1, rel: 0, origin: location.origin },
         events: {
             onReady: () => { scalePlayer(); applyQuality(); if (shareStream) cropShare(); report(); },
             onStateChange: event => {
                 if (event.data === YT.PlayerState.PLAYING) applyQuality();
                 report();
             },
-            onError: event => videoFailed(socket, video.id, event.data)
+            onError: event => {
+                if (event.data === 2 || event.data === 100 || event.data === 101 || event.data === 150) {
+                    videoFailed(socket, video.id, event.data);
+                }
+            }
         }
     });
     reportTimer = setInterval(report, 1000);
@@ -447,12 +460,14 @@ function stopPlayer() {
 
 // Some videos aren't allowed to play outside YouTube (errors 101 and 150)
 function videoFailed(socket, id, error) {
+    playerFailedId = id;
+    stopPlayer();
+    playerFailedId = id; // stopPlayer clears the player, not the reason we stopped
     showHostMessage(error === 101 || error === 150
-        ? "This video can't play here. Play it on YouTube and share that tab instead."
-        : "This video can't be played here. Check the link, or play it on YouTube and share that tab instead.");
+        ? "This video can't play in the page (the owner blocked embeds). Open it on YouTube and share that tab."
+        : "This video can't be played here. Check the link, or open it on YouTube and share that tab.");
     $("hostYouTubeLink").href = `https://www.youtube.com/watch?v=${id}`;
     $("hostYouTubeLink").hidden = false;
-    socket.emit("host:videoFailed");
 }
 
 async function startSharing(socket) {
@@ -512,24 +527,15 @@ function scalePlayer() {
     const slot = $("playerSlot");
     const frame = $("videoFrame");
     if (!slot || !player) return;
-    const { width, height } = playerSize();
-    slot.style.width = `${width}px`;
-    slot.style.height = `${height}px`;
-    player.setSize?.(width, height);
-    const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height) || 1;
-    slot.style.transform = `scale(${scale})`;
+    slot.style.width = "100%";
+    slot.style.height = "100%";
+    slot.style.transform = "";
+    player.setSize?.(frame.clientWidth || 640, frame.clientHeight || 360);
 }
 
 function applyQuality() {
-    const yt = chosenQuality().yt;
     try {
-        if (yt === "default") {
-            player?.setPlaybackQualityRange?.("small", "highres");
-            player?.setPlaybackQuality?.("default");
-        } else {
-            player?.setPlaybackQualityRange?.(yt, yt);
-            player?.setPlaybackQuality?.(yt);
-        }
+        player?.setPlaybackQuality?.(chosenQuality().yt);
     } catch (e) {}
 }
 
@@ -697,6 +703,10 @@ function videoSecondsNow() {
     return video.time + (video.playing ? (Date.now() - videoSeenAt) / 1000 : 0);
 }
 
+function showMyWins(n) {
+    $("myWins").textContent = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
+}
+
 function showPlayers() {
     const players = [...state.players].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
     $("playerList").replaceChildren(...players.map(player => {
@@ -706,7 +716,7 @@ function showPlayers() {
         if (player.oneAway) row.append(el("span", "badge", "1 away!"));
         row.append(
             Object.assign(el("span", "person-meta", `${player.marked}/24`), { title: "Squares marked" }),
-            Object.assign(el("span", "wins", `🏆 ${player.wins}`), { title: "Wins" })
+            Object.assign(el("span", "wins", `🏆 ${player.wins}`), { title: "Wins on their profile" })
         );
         return row;
     }));
@@ -714,7 +724,8 @@ function showPlayers() {
 
 function showFeed() {
     const items = [...state.events].reverse().map(event => {
-        const ids = event.type === "spot" ? event.userIds : [event.userId];
+        const still = event.type === "spot" ? event.userIds.filter(id => !(event.cleared ?? []).includes(id)) : null;
+        const ids = event.type === "spot" ? (still.length ? still : event.userIds) : [event.userId];
         const names = listNames.format(ids.map(id => playerById(id).name));
         const text = el("span", "feed-text");
         if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
@@ -725,6 +736,7 @@ function showFeed() {
         const avatars = el("span", "feed-avatars");
         avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
         const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
+        if (still && still.length === 0) item.classList.add("undone");
         // The host can click a moment from this video to watch it again, from 5 seconds before
         const replayable = playerVideoId !== null && event.videoId === playerVideoId;
         const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));

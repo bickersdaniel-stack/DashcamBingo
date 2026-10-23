@@ -471,9 +471,6 @@ a.btn {
     border-top: 1px solid var(--border);
     background-color: var(--surface);
 }
-.sidebar-handle {
-    display: none;
-}
 .sidebar-head {
     display: flex;
     align-items: center;
@@ -731,6 +728,8 @@ a.btn {
     font-size: 13px;
     font-weight: 600;
     text-align: left;
+    text-decoration: none;
+    box-sizing: border-box;
     cursor: pointer;
 }
 .menu-item:hover {
@@ -990,59 +989,9 @@ a.btn {
     font-weight: 600;
     cursor: pointer;
 }
-.min-tab {
-    margin-left: auto;
-    padding: 12px 8px;
-    border: 0;
-    background: none;
-    color: var(--text-faint);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.min-tab[aria-pressed="true"] {
-    color: var(--accent);
-}
 .tab[aria-selected="true"] {
     border-bottom-color: var(--stamp);
     color: var(--heading);
-}
-.tab-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-body.sidebar-min:not(.sidebar-pop) .tab-panel {
-    display: none !important;
-}
-body.sidebar-min .tabs {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 36;
-    padding: 4px 16px env(safe-area-inset-bottom, 0);
-    border-bottom: 0;
-    border-top: 1px solid var(--border);
-    background-color: var(--surface);
-}
-body.sidebar-min .tab {
-    border-bottom: 0;
-    border-top: 2px solid transparent;
-}
-body.sidebar-min .tab[aria-selected="true"] {
-    border-top-color: var(--stamp);
-}
-body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
-    position: fixed;
-    z-index: 35;
-    width: min(380px, calc(100vw - 24px));
-    max-height: min(70vh, 560px);
-    overflow: auto;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    background-color: var(--surface);
-    box-shadow: 0 16px 48px var(--shadow);
 }
 .people, .feed {
     display: flex;
@@ -1167,8 +1116,7 @@ body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
     align-items: center;
     gap: 8px;
     width: 100%;
-    max-width: 620px;
-    margin: 0 auto 16px;
+    margin: 0 0 6px;
 }
 .host-bar .link-input {
     flex: 1 1 240px; /* Wrap the buttons below rather than squash the link */
@@ -1223,14 +1171,6 @@ textarea.link-input {
     margin-left: 4px;
     font-weight: 600;
     color: var(--accent);
-}
-.video-column {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
-    margin: 0 auto;
 }
 .video-frame {
     position: relative;
@@ -1327,25 +1267,194 @@ textarea.link-input {
     height: 100%;
     border: 0;
 }
-.with-video .host-bar {
-    max-width: none;
+
+/* The room's tiles (see layout.js): gridstack places them, and each is a panel with a title bar to drag it by */
+body.in-room .stage {
+    padding: 12px 16px 16px;
 }
-.with-video .sidebar .board-wrap {
-    margin: 0;
-    padding: 16px 16px 0;
-    box-sizing: border-box;
+.room-grid {
+    margin: 0 -6px; /* gridstack's gap between tiles is inside each tile, so this lines the outer edges up */
 }
-/* The host's card is phone-sized next to the video, so it gets the phone spacing */
-.with-video .sidebar #bingoCardContainer {
-    padding: 6px;
+.room-grid[hidden] {
+    display: none;
+}
+.room-grid > .grid-stack-item > .grid-stack-item-content {
+    overflow: hidden;
+}
+.widget {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
     border-radius: 14px;
+    background-color: var(--surface);
 }
-.with-video .sidebar .bingo-card {
-    --gap: 4px;
-    --pad: 2px;
+.widget-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px 6px 4px 10px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--heading);
+    cursor: grab;
+    user-select: none;
 }
-.with-video .sidebar .bingo-cell {
+.widget-head.room-head {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+.widget-grip {
+    color: var(--text-faint);
+}
+.widget-hide {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
     border-radius: 8px;
+    background: none;
+    color: var(--text-faint);
+    cursor: pointer;
+}
+.widget-hide:hover {
+    background-color: var(--surface-3);
+    color: var(--heading);
+}
+.widget-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+.room-grid .people, .room-grid .feed, .room-grid .win-list {
+    padding: 10px;
+}
+.room-grid .win-list {
+    grid-template-columns: 1fr;
+    min-height: 0;
+}
+.room-grid .sidebar-foot {
+    padding: 8px 12px;
+}
+/* The card is square and as big as fits the space left in its tile under the status line */
+.card-body {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 12px;
+}
+.card-fit {
+    container-type: size;
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    min-height: 0;
+}
+.card-fit #bingoCardContainer {
+    width: min(100cqw, 100cqh);
+    box-sizing: border-box;
+    box-shadow: none;
+}
+/* A small card gets the tighter phone spacing so the words keep their room */
+@container (max-width: 480px) {
+    .bingo-card {
+        --gap: 4px;
+        --pad: 2px;
+    }
+    .bingo-cell {
+        border-radius: 8px;
+    }
+}
+/* The video fills its tile; YouTube and the stream letterbox themselves inside it */
+.video-body {
+    overflow: hidden;
+}
+.video-body .video-frame {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+.moving-tiles iframe, .moving-tiles video {
+    pointer-events: none;
+}
+.grid-stack-placeholder > .placeholder-content {
+    border: 2px dashed var(--stamp);
+    border-radius: 14px;
+    background-color: var(--stamp-ambient);
+}
+.layout-presets, .layout-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.layout-toggles {
+    gap: 4px 14px;
+    margin-top: 10px;
+}
+.layout-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--cell-text);
+}
+.layout-toggle input {
+    accent-color: var(--stamp);
+}
+/* Narrow screens: one tile under another, each as tall as it needs, and no moving them about */
+@media (max-width: 899px) {
+    .room-grid:not([hidden]) {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: auto !important;
+        margin: 0;
+    }
+    .room-grid > .grid-stack-item {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+    }
+    .room-grid > .grid-stack-item > .grid-stack-item-content {
+        position: static !important;
+    }
+    .room-grid > [gs-id="video"] { order: 1; }
+    .room-grid > [gs-id="card"] { order: 2; }
+    .room-grid > [gs-id="players"] { order: 3; }
+    .room-grid > [gs-id="feed"] { order: 4; }
+    .room-grid > [gs-id="wins"] { order: 5; }
+    .room-grid > .grid-stack-item > .ui-resizable-handle, .widget-grip, .layout-presets {
+        display: none !important;
+    }
+    .widget-head {
+        cursor: default;
+    }
+    .widget-body {
+        max-height: 60vh;
+    }
+    .card-body {
+        max-height: none;
+    }
+    .card-fit {
+        container-type: normal;
+    }
+    .card-fit #bingoCardContainer {
+        width: 100%;
+    }
+    .video-body .video-frame {
+        height: auto;
+        aspect-ratio: 16 / 9;
+    }
 }
 /* First visit: pick light or dark and a colour */
 .onboarding {
@@ -1948,25 +2057,6 @@ textarea.link-input {
         border-top: 0;
         border-left: 1px solid var(--border);
     }
-    .sidebar-handle {
-        display: block;
-        position: absolute;
-        top: 0;
-        left: -3px;
-        width: 8px;
-        height: 100%;
-        cursor: col-resize;
-        touch-action: none;
-        z-index: 2;
-    }
-    .sidebar-handle:hover,
-    .resizing-sidebar .sidebar-handle {
-        background-color: var(--accent);
-    }
-    .resizing-sidebar {
-        cursor: col-resize;
-        user-select: none;
-    }
     .win-list {
         flex: 1;
         grid-template-columns: 1fr;
@@ -1976,46 +2066,6 @@ textarea.link-input {
 @media (min-width: 1280px) {
     .sidebar {
         width: var(--sidebar-width, 384px);
-    }
-}
-@media (min-width: 1024px) {
-    .tab-panel {
-        flex: 1;
-    }
-    .people, .feed {
-        overflow-y: auto;
-    }
-    /* With the card on top, the host's sidebar is a little wider and scrolls as a whole */
-    .with-video .sidebar {
-        width: var(--sidebar-width, 400px);
-        overflow-y: auto;
-    }
-    /* The video area never scrolls: the video is as big as fits under the link box */
-    .with-video .stage {
-        overflow-y: hidden;
-    }
-    .with-video .video-frame {
-        width: min(100%, calc((100vh - 240px) * 16 / 9));
-        margin: 0 auto;
-    }
-    .with-video .tab-panel {
-        flex: none;
-    }
-    body.sidebar-min:not(.with-video) .sidebar {
-        width: 0;
-        border: 0;
-        overflow: visible;
-    }
-    body.sidebar-min:not(.with-video) .sidebar-handle {
-        display: none;
-    }
-    body.sidebar-min.with-video .sidebar {
-        padding-bottom: 56px;
-    }
-}
-@media (min-width: 1280px) {
-    .with-video .sidebar {
-        width: var(--sidebar-width, 460px);
     }
 }
 @media (max-width: 639px) {

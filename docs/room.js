@@ -1,6 +1,7 @@
 // Together mode: sign in (Discord, Google or an email link), then rooms where everyone's marks and wins show up live
 import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, setCrossed, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
+import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
 
@@ -74,7 +75,8 @@ function showSignIn() {
 }
 
 function show(...ids) {
-    for (const id of ["signedOut", "lobby", "setup", "roomGone", "game", "sidebar"]) $(id).hidden = !ids.includes(id);
+    for (const id of ["signedOut", "lobby", "setup", "roomGone", "roomGrid"]) $(id).hidden = !ids.includes(id);
+    document.body.classList.toggle("in-room", ids.includes("roomGrid"));
 }
 
 function connect() {
@@ -254,8 +256,8 @@ function joinRoom() {
     $("rerollButton").addEventListener("click", () => socket.emit("card:reroll", { round: state.round.id }));
     $("shareButton").hidden = !navigator.mediaDevices?.getDisplayMedia; // Phones can't share their screen
     $("shareButton").addEventListener("click", () => shareStream ? stopSharing(socket) : startSharing(socket));
-    setUpSidebarResize();
-    setUpSidebarMin();
+    setUpLayout();
+    new ResizeObserver(() => { if (player) scalePlayer(); }).observe($("videoFrame"));
     $("soundButton").addEventListener("click", () => {
         $("liveVideo").muted = false;
         $("soundButton").hidden = true;
@@ -263,12 +265,11 @@ function joinRoom() {
     const savedVolume = Number(load("streamVolume"));
     if (savedVolume >= 0 && savedVolume <= 1) $("streamVolume").value = String(savedVolume);
     $("streamVolume").addEventListener("input", applyStreamVolume);
-    document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
     setInterval(() => state && showNowPlaying(), 1000);
 }
 
 function showRoom(socket) {
-    show("game", "sidebar");
+    show("roomGrid");
     $("roomCode").textContent = state.code;
     $("roundNumber").textContent = `Round ${state.round.number}`;
 
@@ -345,71 +346,9 @@ function readVideoLink() {
     return video;
 }
 
-// A host playing a video, or a viewer watching the host's stream, gets it large on the left
-// and their card above the tabs on the right
+// A host playing a video, or a viewer watching the host's stream, gets the tiles laid out around the video
 function arrange(withVideo) {
-    document.body.classList.toggle("with-video", withVideo);
-    $("videoColumn").hidden = !withVideo;
-    if (withVideo) $("sidebar").prepend($("game"));
-    else $("stage").append($("game"));
-}
-
-function selectTab(tab) {
-    const again = tab.getAttribute("aria-selected") === "true" && document.body.classList.contains("sidebar-pop");
-    document.querySelectorAll(".tab").forEach(other => {
-        other.setAttribute("aria-selected", other === tab);
-        $(other.getAttribute("aria-controls")).hidden = other !== tab;
-    });
-    if (!document.body.classList.contains("sidebar-min")) return;
-    document.body.classList.toggle("sidebar-pop", !again);
-    if (!again) placeSidebarPop();
-    else clearSidebarPopStyle();
-}
-
-function setSidebarMin(min) {
-    document.body.classList.toggle("sidebar-min", min);
-    document.body.classList.remove("sidebar-pop");
-    clearSidebarPopStyle();
-    $("sidebarMin").setAttribute("aria-pressed", min);
-    $("sidebarMin").textContent = min ? "Menu" : "Minimise";
-    $("sidebarMin").title = min ? "Show side menu" : "Minimise";
-    save("sidebarMin", min ? "1" : "");
-}
-
-function clearSidebarPopStyle() {
-    document.querySelectorAll("#sidebar .tab-panel").forEach(panel => {
-        panel.style.width = panel.style.left = panel.style.top = panel.style.bottom = "";
-    });
-}
-
-function placeSidebarPop() {
-    const panel = document.querySelector("#sidebar .tab-panel:not([hidden])");
-    const tabs = document.querySelector("#sidebar .tabs");
-    if (!panel || !document.body.classList.contains("sidebar-pop")) return;
-    const box = tabs.getBoundingClientRect();
-    const width = Math.min(380, innerWidth - 24);
-    panel.style.width = `${width}px`;
-    panel.style.left = `${Math.max(12, box.right - width)}px`;
-    panel.style.top = "auto";
-    panel.style.bottom = `${innerHeight - box.top + 8}px`;
-}
-
-function setUpSidebarMin() {
-    if (load("sidebarMin")) setSidebarMin(true);
-    $("sidebarMin").addEventListener("click", () => setSidebarMin(!document.body.classList.contains("sidebar-min")));
-    document.addEventListener("click", event => {
-        if (!document.body.classList.contains("sidebar-pop")) return;
-        if (event.target.closest("#sidebar")) return;
-        document.body.classList.remove("sidebar-pop");
-        clearSidebarPopStyle();
-    });
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape") {
-            document.body.classList.remove("sidebar-pop");
-            clearSidebarPopStyle();
-        }
-    });
-    window.addEventListener("resize", placeSidebarPop);
+    useLayout(withVideo ? "video" : "plain");
 }
 
 async function startPlayer(socket, video) {
@@ -567,39 +506,6 @@ async function applyCaptureQuality() {
     try {
         await track.applyConstraints({ frameRate: 30, height, width });
     } catch (e) {}
-}
-
-function setUpSidebarResize() {
-    const saved = Number(load("sidebarWidth"));
-    if (saved >= 280) document.documentElement.style.setProperty("--sidebar-width", `${saved}px`);
-    const handle = $("sidebarHandle");
-    let dragging = false;
-    handle.addEventListener("pointerdown", event => {
-        if (event.button !== 0) return;
-        dragging = true;
-        handle.setPointerCapture(event.pointerId);
-        document.body.classList.add("resizing-sidebar");
-    });
-    handle.addEventListener("pointermove", event => {
-        if (!dragging) return;
-        const layout = document.querySelector(".layout");
-        const max = Math.min(layout.clientWidth * 0.55, layout.clientWidth - 280);
-        const width = Math.round(Math.min(Math.max(layout.getBoundingClientRect().right - event.clientX, 280), max));
-        document.documentElement.style.setProperty("--sidebar-width", `${width}px`);
-        scalePlayer();
-    });
-    const endDrag = () => {
-        if (!dragging) return;
-        dragging = false;
-        document.body.classList.remove("resizing-sidebar");
-        const width = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-width"), 10);
-        if (width) save("sidebarWidth", String(width));
-        scalePlayer();
-        applyQuality();
-    };
-    handle.addEventListener("pointerup", endDrag);
-    handle.addEventListener("pointercancel", endDrag);
-    new ResizeObserver(() => { if (player) scalePlayer(); }).observe($("videoFrame"));
 }
 
 // A viewer asked for the stream: the host opens a connection just for them

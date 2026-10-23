@@ -2,8 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { packsFrom, pickCards } from "./rooms.js";
 import { migrate, store } from "./store.js";
+import { tidyLines } from "./suggestions.js";
 
 const card = (n, pack = "core", dealt = 0, spotted = 0) => ({ id: `c${n}`, text: `Card ${n}`, description: "", pack, dealt, spotted });
+
+test("tidyLines keeps line breaks in descriptions but tidies each line", () => {
+    assert.equal(tidyLines("  Must be alive  \r\n- not   roadkill\n\n\n\nOn the road\u0007 "), "Must be alive\n- not roadkill\n\nOn the road");
+    assert.equal(tidyLines("\n\n  one line \n"), "one line");
+    assert.equal(tidyLines(undefined), "");
+});
 
 test("migrate turns the phrase list and approved suggestions into Core cards", () => {
     const by = { id: "u1", name: "Sam" };

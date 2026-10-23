@@ -979,14 +979,16 @@ function showPackTotal() {
     return enough;
 }
 
-// Squares with a description show it at the pointer: hover with a mouse, or press and hold on a touch screen
-const holdMs = 2000;
+// Squares with a description show it at the pointer after a while: resting the mouse on one, or holding a finger on it.
+// Long enough that it doesn't pop up while you move around the card
+const tipDelayMs = 2000;
 
 function setUpCardTips() {
     const card = $("bingoCard");
     const tip = $("cardTip");
     let timer = null;
     let start = null;          // Where a touch began, so moving it cancels the hold
+    let mouse = null;          // Where the mouse is now, so the tip opens there after the wait
     let swallowClick = false;  // Lifting the finger after a hold isn't a tap
     const hide = () => {
         clearTimeout(timer);
@@ -1004,12 +1006,14 @@ function setUpCardTips() {
         const cell = event.target.closest(".has-note");
         if (event.pointerType !== "mouse" || !cell) return;
         clearTimeout(timer);
-        timer = setTimeout(() => showAt(cell, event.clientX, event.clientY), 400);
+        mouse = { x: event.clientX, y: event.clientY };
+        timer = setTimeout(() => showAt(cell, mouse.x, mouse.y), tipDelayMs);
     });
     card.addEventListener("pointermove", event => {
         if (event.pointerType === "mouse") {
+            mouse = { x: event.clientX, y: event.clientY };
             const cell = event.target.closest(".has-note");
-            if (cell && !tip.hidden) showAt(cell, event.clientX, event.clientY);
+            if (cell && !tip.hidden) showAt(cell, mouse.x, mouse.y);
         } else if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
             clearTimeout(timer);
             start = null;
@@ -1025,7 +1029,7 @@ function setUpCardTips() {
         timer = setTimeout(() => {
             showAt(cell, start.x, start.y);
             swallowClick = true;
-        }, holdMs);
+        }, tipDelayMs);
     });
     for (const type of ["pointerup", "pointercancel"]) {
         card.addEventListener(type, event => {

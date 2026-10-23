@@ -13,6 +13,8 @@ export const adminOnly = (req, res, next) => isAdmin(req.session.user) ? next() 
 
 // One space between words, no control characters
 export const tidy = text => String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
+// The same for each line of a card's description, keeping the line breaks (and at most one blank line in a row)
+export const tidyLines = text => String(text ?? "").split(/\r\n?|\n/).map(tidy).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 
 // ignoreId skips the card or suggestion being edited, so keeping its own wording isn't a clash
@@ -24,7 +26,7 @@ function problemWith(text, ignoreId) {
     return null;
 }
 
-const descriptionProblem = description => description.length > 140 ? "Keep the description to 140 characters." : null;
+const descriptionProblem = description => description.length > 300 ? "Keep the description to 300 characters." : null;
 
 export function cardProblem({ text, description, pack }, ignoreId) {
     return problemWith(text, ignoreId) ?? descriptionProblem(description)
@@ -39,7 +41,7 @@ suggestions.post("/api/suggestions", signedIn, json, (req, res) => {
     const user = req.session.user;
     if (isBlocked(user.id)) return res.status(403).json({ error: "You can't suggest squares right now." });
     const text = tidy(req.body?.text);
-    const description = tidy(req.body?.description);
+    const description = tidyLines(req.body?.description);
     const problem = problemWith(text) ?? descriptionProblem(description);
     if (problem) return res.status(400).json({ error: problem });
     if (store.suggestions.filter(s => s.by.id === user.id && s.status === "pending").length >= 5) {
@@ -66,7 +68,7 @@ suggestions.post("/api/admin/suggestions/:id", adminOnly, json, (req, res) => {
     } else if (req.body?.action === "approve") {
         const card = {
             text: req.body.text === undefined ? suggestion.text : tidy(req.body.text),
-            description: req.body.description === undefined ? suggestion.description ?? "" : tidy(req.body.description),
+            description: req.body.description === undefined ? suggestion.description ?? "" : tidyLines(req.body.description),
             pack: String(req.body.pack ?? defaultPacks()[0] ?? store.packs[0].id)
         };
         const problem = cardProblem(card, suggestion.id);

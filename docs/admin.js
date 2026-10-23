@@ -55,7 +55,7 @@ function showSuggestions(list) {
         if (!s) return el("li", "item empty", "Nothing waiting. 🎉");
         const item = el("li", "item admin-row");
         const text = input(s.text, 60, "Square wording");
-        const description = input(s.description ?? "", 140, "Description (optional)");
+        const description = textarea(s.description ?? "", "Description (optional)");
         const pack = fillPackSelect(el("select", "quality-select pack-select"), firstOnPack());
         const decide = action => async () => {
             const result = await api("POST", `/api/admin/suggestions/${s.id}`, { action, text: text.value, description: description.value, pack: pack.value });
@@ -88,7 +88,7 @@ function showCards() {
         if (!card) return el("li", "item empty", "No cards match.");
         const item = el("li", "item admin-row");
         const text = input(card.text, 60, "Card wording");
-        const description = input(card.description, 140, "Description (optional)");
+        const description = textarea(card.description, "Description (optional)");
         const pack = fillPackSelect(el("select", "quality-select pack-select"), card.pack);
         const r = rate(card);
         const stats = el("span", "admin-stats", r === null ? "Not enough games yet" : `Spotted ${Math.round(r * 100)}%`);
@@ -214,6 +214,11 @@ function showSaveWhenEdited(item, save) {
 
 function input(value, maxLength, label) {
     return Object.assign(el("input", "link-input"), { value, maxLength, placeholder: label, ariaLabel: label, autocomplete: "off" });
+}
+
+// A card description can run over several lines; the box grows with it
+function textarea(value, label) {
+    return Object.assign(el("textarea", "link-input"), { value, maxLength: 300, rows: 1, placeholder: label, ariaLabel: label });
 }
 
 function button(text, className, onclick) {

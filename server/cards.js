@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { cardsIn, save, store } from "./store.js";
-import { adminOnly, cardProblem, json, signedIn, tidy } from "./suggestions.js";
+import { adminOnly, cardProblem, json, signedIn, tidy, tidyLines } from "./suggestions.js";
 
 export const cards = Router();
 
@@ -25,7 +25,7 @@ cards.get("/api/cards", signedIn, (req, res) => {
 cards.get("/api/admin/cards", adminOnly, (req, res) => res.json({ packs: packList(), cards: store.cards }));
 
 cards.post("/api/admin/cards", adminOnly, json, (req, res) => {
-    const card = { text: tidy(req.body?.text), description: tidy(req.body?.description), pack: String(req.body?.pack ?? "") };
+    const card = { text: tidy(req.body?.text), description: tidyLines(req.body?.description), pack: String(req.body?.pack ?? "") };
     const problem = cardProblem(card);
     if (problem) return res.status(400).json({ error: problem });
     const row = { id: randomUUID(), ...card, by: null, at: Date.now(), dealt: 0, spotted: 0 };
@@ -39,7 +39,7 @@ cards.patch("/api/admin/cards/:id", adminOnly, json, (req, res) => {
     if (!row) return res.status(404).json({ error: "That card has been deleted." });
     const card = {
         text: field(req.body, "text", row.text),
-        description: field(req.body, "description", row.description),
+        description: field(req.body, "description", row.description, tidyLines),
         pack: field(req.body, "pack", row.pack, String)
     };
     const problem = cardProblem(card, row.id);

@@ -58,7 +58,7 @@
     </header>
 
     <main class="layout">
-        <section class="stage">
+        <section class="stage" id="stage">
             <div class="ambient-glow"></div>
             <div class="lobby" id="signedOut" hidden>
                 <h2>Play together</h2>
@@ -82,6 +82,18 @@
                 <a class="btn" href="/">Back to start</a>
             </div>
 
+            <form class="host-bar" id="hostBar" hidden>
+                <input class="link-input" id="videoLink" placeholder="Paste a YouTube link, or leave empty for no video" autocomplete="off" spellcheck="false" aria-label="YouTube link">
+                <button class="btn" type="submit">Start round</button>
+                <p class="host-note" id="hostNote" hidden>
+                    <span id="hostMessage"></span>
+                    <a id="hostYouTubeLink" target="_blank" rel="noopener" hidden>Open on YouTube</a>
+                </p>
+            </form>
+            <div class="video-column" id="videoColumn" hidden>
+                <div class="video-frame" id="videoFrame"></div>
+            </div>
+
             <div class="board-wrap" id="game" hidden>
                 <div class="room-head">
                     <span>Room <span class="room-code" id="roomCode"></span></span>
@@ -90,8 +102,8 @@
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                         <span id="copyInviteLabel">Copy invite link</span>
                     </button>
-                    <button class="pill" id="newRoundButton" type="button" hidden>New round</button>
                 </div>
+                <p class="now-playing" id="nowPlaying" hidden>Now playing: <em id="nowPlayingTitle"></em> · <span id="nowPlayingTime"></span></p>
                 <div class="status-row">
                     <span class="bingo-alert" id="bingoAlert" hidden>🎉 Bingo winner!</span>
                 </div>
@@ -104,8 +116,8 @@
 
         <aside class="sidebar" id="sidebar" hidden>
             <div class="tabs" role="tablist">
-                <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
-                <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="feedPanel">Feed</button>
+                <button class="tab" id="playersTab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
+                <button class="tab" id="feedTab" type="button" role="tab" aria-selected="false" aria-controls="feedPanel">Feed</button>
                 <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="winsPanel">Winning cards</button>
             </div>
             <div class="tab-panel" id="playersPanel" role="tabpanel">

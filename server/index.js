@@ -35,7 +35,9 @@ app.get(["/", "/r/:code"], async (req, res) => {
     const page = await readFile(`${docs}/room.html`, "utf8");
     res.type("html").send(page.replace('"/styles.css"', `"/v/${version}/styles.css"`).replace('"/room.js"', `"/v/${version}/room.js"`));
 });
-app.use(["/v/:version", "/"], express.static(docs, { index: false })); // Only docs/ is public, never server code or .env
+const site = express.static(docs, { index: false }); // Only docs/ is public, never server code or .env
+app.use("/v/:version", site);
+app.use(site);
 
 const server = createServer(app);
 const io = new Server(server);

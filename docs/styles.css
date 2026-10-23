@@ -814,6 +814,115 @@ button:focus-visible, .custom-colour:focus-within {
     text-align: center;
     color: var(--text-faint);
 }
+.now-playing {
+    margin: 0 0 8px;
+    padding: 0 4px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.now-playing em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--heading);
+}
+.feed-item.replayable {
+    cursor: pointer;
+}
+.feed-item.replayable:hover {
+    border-color: var(--border-strong);
+    background-color: var(--surface-3);
+}
+.feed-time.replay {
+    padding: 4px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background-color: var(--surface);
+    color: var(--accent);
+    cursor: pointer;
+}
+
+/* The host's YouTube link box and video */
+.host-bar {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto 16px;
+}
+.link-input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+}
+.link-input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.host-note {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--amber);
+}
+.host-note a {
+    margin-left: 4px;
+    font-weight: 600;
+    color: var(--accent);
+}
+.video-column {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    margin: 0 auto;
+}
+.video-frame {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: #000;
+    box-shadow: 0 25px 50px -12px var(--board-shadow);
+}
+.video-frame iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+.video-column .feed {
+    padding: 8px 0;
+}
+.hosting .host-bar {
+    max-width: none;
+}
+.hosting .sidebar .board-wrap {
+    margin: 0;
+    padding: 16px 16px 0;
+    box-sizing: border-box;
+}
+/* The host's card is phone-sized next to the video, so it gets the phone spacing */
+.hosting .sidebar #bingoCardContainer {
+    padding: 6px;
+    border-radius: 14px;
+}
+.hosting .sidebar .bingo-card {
+    --gap: 4px;
+    --pad: 2px;
+}
+.hosting .sidebar .bingo-cell {
+    border-radius: 8px;
+}
 /* Someone else just spotted this one: glow with their picture in the corner */
 .bingo-cell.spotted {
     border-color: var(--stamp);
@@ -864,6 +973,19 @@ button:focus-visible, .custom-colour:focus-within {
     }
     .people, .feed {
         overflow-y: auto;
+    }
+    /* With the card on top, the host's sidebar is a little wider and scrolls as a whole */
+    .hosting .sidebar {
+        width: 400px;
+        overflow-y: auto;
+    }
+    .hosting .tab-panel {
+        flex: none;
+    }
+}
+@media (min-width: 1280px) {
+    .hosting .sidebar {
+        width: 460px;
     }
 }
 @media (max-width: 639px) {

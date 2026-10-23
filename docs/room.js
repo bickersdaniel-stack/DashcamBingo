@@ -2,6 +2,7 @@
 import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, setCrossed, captureScreenshot } from "./core.js";
 import { countLines } from "./shared/lines.js";
+import { parseYouTubeLink } from "./youtube.js";
 
 const $ = id => document.getElementById(id);
 const code = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})$/)?.[1].toUpperCase();
@@ -11,6 +12,11 @@ let state = null;         // What the server last said about the room
 let marked = new Set();   // My marked squares
 let bestLines = 0;        // Most lines on my card this round, so only a new line takes a screenshot
 const pulses = new Map(); // Square index -> timer, for squares someone else just spotted
+let videoSeenAt = 0;      // When the video's time last arrived, to count on from
+let player = null;        // The host's YouTube player
+let playerVideoId = null;
+let reportTimer = null;
+let youTube = null;       // YouTube's player script, loaded once when the host first needs it
 
 if (me) {
     $("account").hidden = false;
@@ -79,6 +85,7 @@ function joinRoom() {
     }));
     socket.on("room:state", newState => {
         state = newState;
+        videoSeenAt = Date.now();
         showRoom(socket);
     });
     socket.on("player:update", player => {
@@ -96,6 +103,13 @@ function joinRoom() {
         showFeed();
         if (event.type === "spot") pulse(event);
     });
+    socket.on("video:update", video => {
+        if (!state) return;
+        state.round.video = video;
+        videoSeenAt = Date.now();
+        if (video) showNowPlaying();
+        else showVideo(socket); // The host's video couldn't play, so the round counts from its start
+    });
 
     $("copyInviteButton").addEventListener("click", () => {
         navigator.clipboard.writeText(`${location.origin}/r/${state.code}`).then(() => {
@@ -103,22 +117,24 @@ function joinRoom() {
             setTimeout(() => $("copyInviteLabel").textContent = "Copy invite link", 2000);
         });
     });
-    $("newRoundButton").addEventListener("click", () => {
-        if (confirm("Start a new round? Everyone gets a fresh card.")) socket.emit("host:newRound");
+    $("hostBar").addEventListener("submit", event => {
+        event.preventDefault();
+        const text = $("videoLink").value.trim();
+        const video = text ? parseYouTubeLink(text) : null;
+        if (text && !video) return showHostMessage("That doesn't look like a YouTube link.");
+        if (!confirm(`Start a new round${video ? " with this video" : " without a video"}? Everyone gets a fresh card.`)) return;
+        $("hostNote").hidden = true;
+        $("videoLink").value = "";
+        socket.emit("host:newRound", video ? { videoId: video.id, start: video.start } : {});
     });
-    document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
-        document.querySelectorAll(".tab").forEach(other => {
-            other.setAttribute("aria-selected", other === tab);
-            $(other.getAttribute("aria-controls")).hidden = other !== tab;
-        });
-    }));
+    document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
+    setInterval(() => state && showNowPlaying(), 1000);
 }
 
 function showRoom(socket) {
     show("game", "sidebar");
     $("roomCode").textContent = state.code;
     $("roundNumber").textContent = `Round ${state.round.number}`;
-    $("newRoundButton").hidden = state.hostId !== me.id;
 
     marked = new Set(state.card.marked);
     bestLines = state.card.bestLines; // A refresh doesn't screenshot a line you already had
@@ -136,6 +152,7 @@ function showRoom(socket) {
     });
     marked.forEach(index => setCrossed($("bingoCard").children[index], true));
     $("bingoAlert").hidden = countLines(marked) === 0;
+    showVideo(socket);
     showPlayers();
     showFeed();
 }
@@ -147,6 +164,107 @@ function checkBingo() {
         bestLines = lines;
         captureScreenshot();
     }
+}
+
+function showVideo(socket) {
+    const isHost = state.hostId === me.id;
+    const hosting = isHost && !!state.round.video;
+    $("hostBar").hidden = !isHost;
+    arrange(hosting);
+    if (hosting) startPlayer(socket, state.round.video);
+    else stopPlayer();
+    showNowPlaying();
+}
+
+// A host playing a video gets it large on the left with the feed under it, and their card on the right
+function arrange(hosting) {
+    document.body.classList.toggle("hosting", hosting);
+    $("videoColumn").hidden = !hosting;
+    $("feedTab").hidden = hosting;
+    if (hosting) {
+        $("sidebar").prepend($("game"));
+        $("videoColumn").append($("feedPanel"));
+    } else {
+        $("stage").append($("game"));
+        $("winsPanel").before($("feedPanel"));
+    }
+    const selected = document.querySelector('.tab[aria-selected="true"]');
+    selectTab(hosting && selected === $("feedTab") ? $("playersTab") : selected);
+}
+
+function selectTab(tab) {
+    document.querySelectorAll(".tab").forEach(other => {
+        other.setAttribute("aria-selected", other === tab);
+        $(other.getAttribute("aria-controls")).hidden = other !== tab;
+    });
+    if (document.body.classList.contains("hosting")) $("feedPanel").hidden = false; // It sits under the video instead
+}
+
+async function startPlayer(socket, video) {
+    if (playerVideoId === video.id) return; // Keeps playing through a reconnect
+    stopPlayer();
+    playerVideoId = video.id;
+    youTube ??= new Promise(resolve => {
+        window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+        document.head.append(Object.assign(document.createElement("script"), { src: "https://www.youtube.com/iframe_api" }));
+    });
+    const YT = await youTube;
+    if (playerVideoId !== video.id) return; // Another round started while the script loaded
+
+    const holder = document.createElement("div");
+    $("videoFrame").replaceChildren(holder);
+    const report = () => {
+        if (!player?.getCurrentTime) return; // Not ready yet
+        socket.emit("host:video", {
+            videoId: video.id, title: player.getVideoData()?.title ?? "",
+            time: player.getCurrentTime(), playing: player.getPlayerState() === YT.PlayerState.PLAYING
+        });
+    };
+    player = new YT.Player(holder, {
+        videoId: video.id,
+        playerVars: { start: Math.floor(video.time), playsinline: 1, rel: 0 },
+        events: { onReady: report, onStateChange: report, onError: event => videoFailed(socket, video.id, event.data) }
+    });
+    reportTimer = setInterval(report, 1000);
+}
+
+function stopPlayer() {
+    clearInterval(reportTimer);
+    player?.destroy?.();
+    player = null;
+    playerVideoId = null;
+    $("videoFrame").replaceChildren();
+}
+
+// Some videos aren't allowed to play outside YouTube (errors 101 and 150)
+function videoFailed(socket, id, error) {
+    showHostMessage(error === 101 || error === 150
+        ? "This video can't play here. Play it on YouTube and share that tab instead."
+        : "This video can't be played here. Check the link, or play it on YouTube and share that tab instead.");
+    $("hostYouTubeLink").href = `https://www.youtube.com/watch?v=${id}`;
+    $("hostYouTubeLink").hidden = false;
+    socket.emit("host:videoFailed");
+}
+
+function showHostMessage(text) {
+    $("hostMessage").textContent = text;
+    $("hostYouTubeLink").hidden = true;
+    $("hostNote").hidden = false;
+}
+
+function replay(event) {
+    player?.seekTo?.(Math.max(0, event.videoTime - 5), true);
+    player?.playVideo?.();
+}
+
+// Players see where the host's video is up to, counting on between the host's reports
+function showNowPlaying() {
+    const video = state.round.video;
+    $("nowPlaying").hidden = !video || state.hostId === me.id;
+    if ($("nowPlaying").hidden) return;
+    const seconds = video.time + (video.playing ? (Date.now() - videoSeenAt) / 1000 : 0);
+    $("nowPlayingTitle").textContent = video.title || "the host's video";
+    $("nowPlayingTime").textContent = formatTime(Math.floor(seconds));
 }
 
 function showPlayers() {
@@ -175,7 +293,16 @@ function showFeed() {
         const avatars = el("span", "feed-avatars");
         avatars.append(...ids.map(id => avatar(playerById(id))));
         const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
-        item.append(avatars, text, el("span", "feed-time", formatTime(event.videoTime)));
+        // The host can click a moment from this video to watch it again, from 5 seconds before
+        const replayable = playerVideoId !== null && event.videoId === playerVideoId;
+        const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
+        if (replayable) {
+            time.type = "button";
+            time.title = "Replay from 5 seconds before";
+            item.classList.add("replayable");
+            item.addEventListener("click", () => replay(event));
+        }
+        item.append(avatars, text, time);
         return item;
     });
     $("feedList").replaceChildren(...items);
@@ -218,5 +345,8 @@ function el(tag, className, text) {
 }
 
 function formatTime(seconds) {
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds / 60) % 60;
+    const rest = String(seconds % 60).padStart(2, "0");
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }

@@ -9,6 +9,8 @@ const maxRooms = 200; // shortcut: one cap for everyone stops endless room creat
 const spotMergeMs = 30 * 1000;
 const spotGapMs = 1000;
 const emptyRoomMs = 6 * 60 * 60 * 1000;
+const maxVideoSeconds = 10_000_000; // Room for long live streams
+const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
 
 export function setupRooms(io) {
@@ -72,11 +74,34 @@ export function setupRooms(io) {
             io.to(room.code).emit("player:update", playerInfo(room, player));
         });
 
-        socket.on("host:newRound", async () => {
+        // A new round, with the host's YouTube video if they gave one
+        socket.on("host:newRound", async data => {
             const room = rooms.get(socket.data.code);
             if (!room || room.hostId !== user.id) return;
-            startRound(room);
+            const videoId = videoIdPattern.test(data?.videoId) ? data.videoId : null;
+            const start = Number.isFinite(data?.start) ? Math.min(Math.max(data.start, 0), maxVideoSeconds) : 0;
+            startRound(room, videoId && { id: videoId, title: "", time: start, playing: false, reportedAt: Date.now() });
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
+        });
+
+        // The host's player says where it's up to, about once a second
+        socket.on("host:video", data => {
+            const room = rooms.get(socket.data.code);
+            const video = room?.round.video;
+            if (!video || room.hostId !== user.id || data?.videoId !== video.id) return;
+            const { time, playing, title } = data;
+            if (!Number.isFinite(time) || time < 0 || time > maxVideoSeconds || typeof playing !== "boolean") return;
+            Object.assign(video, { time, playing, reportedAt: Date.now() });
+            if (typeof title === "string") video.title = title.slice(0, 200);
+            socket.to(room.code).emit("video:update", videoInfo(video));
+        });
+
+        // The video can't play in the site, so the round goes back to counting from its start
+        socket.on("host:videoFailed", () => {
+            const room = rooms.get(socket.data.code);
+            if (!room?.round.video || room.hostId !== user.id) return;
+            room.round.video = null;
+            io.to(room.code).emit("video:update", null);
         });
 
         socket.on("disconnect", () => {
@@ -97,8 +122,8 @@ export function setupRooms(io) {
     }, 10 * 60 * 1000).unref();
 }
 
-function startRound(room) {
-    room.round = { number: (room.round?.number ?? 0) + 1, startedAt: Date.now(), cards: new Map(), events: [] };
+function startRound(room, video = null) {
+    room.round = { number: (room.round?.number ?? 0) + 1, startedAt: Date.now(), video, cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard());
 }
 
@@ -128,8 +153,10 @@ function spot(io, room, player, phrase) {
 
 function addEvent(io, room, event) {
     const now = Date.now();
-    // Seconds into the round; Phase 4 swaps in the video's time when the host plays one
-    Object.assign(event, { id: room.nextEventId++, at: now, videoTime: Math.floor((now - room.round.startedAt) / 1000) });
+    const video = room.round.video;
+    // Where the host's video is up to, or seconds into the round when there's no video
+    const seconds = video ? videoTimeNow(video) : (now - room.round.startedAt) / 1000;
+    Object.assign(event, { id: room.nextEventId++, at: now, videoTime: Math.floor(seconds), videoId: video?.id ?? null });
     room.round.events.push(event);
     if (room.round.events.length > 200) room.round.events.shift();
     io.to(room.code).emit("event", event);
@@ -150,9 +177,18 @@ function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
     return {
         code: room.code, hostId: room.hostId,
-        round: { number: room.round.number },
+        round: { number: room.round.number, video: videoInfo(room.round.video) },
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
         card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines }
     };
+}
+
+// A guess at where the host's video is now: their last report, plus the time since if it was playing
+function videoTimeNow(video) {
+    return video.time + (video.playing ? (Date.now() - video.reportedAt) / 1000 : 0);
+}
+
+function videoInfo(video) {
+    return video && { id: video.id, title: video.title, time: videoTimeNow(video), playing: video.playing };
 }

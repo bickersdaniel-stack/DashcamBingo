@@ -628,6 +628,10 @@ function setUpSuggestions() {
         $(id).hidden = !text;
     };
 
+    const showPhrases = async id => {
+        const text = await fetch("/phrases.txt").then(r => r.text());
+        $(id).replaceChildren(...text.split("\n").map(s => s.trim()).filter(Boolean).map(phrase => el("span", "phrase", phrase)));
+    };
     const showMine = async () => {
         const { data } = await api("GET", "/api/suggestions");
         $("mySuggestions").replaceChildren(...(data.length ? data : [null]).map(s => {
@@ -640,7 +644,7 @@ function setUpSuggestions() {
     $("suggestButton").addEventListener("click", async () => {
         setMenuOpen(false);
         message("suggestMessage", "", true);
-        await showMine();
+        await Promise.all([showMine(), showPhrases("suggestPhrases")]);
         $("suggestDialog").showModal();
         $("suggestText").focus();
     });
@@ -686,12 +690,16 @@ function setUpSuggestions() {
             item.append(el("span", "item-text", square.text), el("span", "item-by", `from ${square.by.name}`), remove);
             return item;
         }));
+        await showPhrases("reviewPhrases");
     };
     $("reviewButton").addEventListener("click", async () => {
         setMenuOpen(false);
         message("reviewMessage", "", true);
         await showReview();
-        $("reviewDialog").showModal();
+        if (!$("reviewDialog").open) $("reviewDialog").show();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && $("reviewDialog").open && !$("suggestDialog").open) $("reviewDialog").close();
     });
     showReview(); // Fills in the waiting count on the menu
 }

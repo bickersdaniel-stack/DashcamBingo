@@ -1308,6 +1308,26 @@ a.btn {
     background-color: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(2px);
 }
+/* Fills the page under the top bar so the header stays put */
+.panel-dialog.full[open] {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 64px 0 0;
+    z-index: 30;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+.panel-dialog.full .item-list {
+    flex: 0 1 auto;
+    max-height: 28vh;
+}
 .panel-dialog h2 {
     margin: 0 0 6px;
     font-size: 20px;
@@ -1389,6 +1409,32 @@ a.btn {
     display: flex;
     justify-content: flex-end;
     margin-top: 18px;
+}
+.panel-dialog.full > * {
+    width: min(56rem, 100%);
+    margin-left: auto;
+    margin-right: auto;
+}
+.phrase-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 36vh;
+    overflow-y: auto;
+}
+.phrase-list .phrase {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--surface-2);
+    font-size: 12px;
+    color: var(--text);
+}
+.panel-dialog.full .phrase-list {
+    flex: 1;
+    min-height: 8rem;
+    max-height: none;
+    align-content: start;
 }
 
 /* Results of the round that just ended */

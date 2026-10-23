@@ -247,15 +247,19 @@
         <p class="email-message" id="suggestMessage" role="status" hidden></p>
         <p class="menu-label">Your suggestions</p>
         <ul class="item-list" id="mySuggestions"></ul>
+        <p class="menu-label">On the cards</p>
+        <div class="phrase-list" id="suggestPhrases"></div>
         <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>
     </dialog>
 
-    <dialog class="panel-dialog" id="reviewDialog" aria-labelledby="reviewTitle">
+    <dialog class="panel-dialog full" id="reviewDialog" aria-labelledby="reviewTitle">
         <h2 id="reviewTitle">Suggested squares</h2>
         <p>Approve to add a square to new cards. You can tidy the wording first.</p>
         <p class="email-message" id="reviewMessage" role="status" hidden></p>
         <ul class="item-list" id="pendingList"></ul>
-        <p class="menu-label">Added to the cards</p>
+        <p class="menu-label">On the cards</p>
+        <div class="phrase-list" id="reviewPhrases"></div>
+        <p class="menu-label">Added from suggestions</p>
         <ul class="item-list" id="approvedList"></ul>
         <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>
     </dialog>

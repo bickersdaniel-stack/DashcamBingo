@@ -65,7 +65,7 @@ colorPicker.addEventListener("change", (event) => {
     setColourMenuOpen(false);
 });
 
-document.getElementById("clearHistoryButton").addEventListener("click", () => {
+document.getElementById("clearHistoryButton")?.addEventListener("click", () => {
     gallery.querySelectorAll(".win-card").forEach(card => {
         URL.revokeObjectURL(card.querySelector("img").src);
         card.remove();

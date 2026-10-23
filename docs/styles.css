@@ -599,6 +599,66 @@ button:focus-visible, .custom-colour:focus-within {
     color: var(--cell-text);
 }
 
+/* Together mode: who's signed in, and the lobby card */
+.account {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cell-text);
+}
+.account-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+}
+.lobby {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    margin: auto;
+    padding: 32px;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--board-bg);
+    box-shadow: 0 25px 50px -12px var(--board-shadow);
+    text-align: center;
+}
+.lobby h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--heading);
+}
+.lobby p {
+    margin: 0 0 24px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.lobby p:last-child {
+    margin-bottom: 0;
+}
+.lobby .btn {
+    text-decoration: none;
+}
+.lobby-avatar {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--stamp);
+}
+
 /* Wide screens: winning cards become a full-height column on the right */
 @media (min-width: 1024px) {
     body {
@@ -667,6 +727,22 @@ button:focus-visible, .custom-colour:focus-within {
 }
 @media (max-width: 419px) {
     .colour-code {
+        display: none;
+    }
+}
+/* The together mode bar also holds the account, so it drops labels sooner */
+@media (max-width: 1279px) {
+    .account-name {
+        display: none;
+    }
+}
+@media (max-width: 1023px) {
+    .room-bar .picker-label, .signout-label {
+        display: none;
+    }
+}
+@media (max-width: 639px) {
+    .account .avatar, .room-bar .colour-code {
         display: none;
     }
 }

@@ -10,7 +10,7 @@ This plan is written for a **new chat on the Linux server box**, which won't hav
 2. Start a chat in that folder and say: *"Follow TOGETHER_MODE_PLAN.md, starting at Phase 0. Check with me before pushing anything."*
 3. Work through it **one phase at a time**. Each phase ends in something that works and can be tested.
 
-Replace `bingo.example.com` everywhere with the real subdomain you pick.
+The real address is **https://bingo.dkb.lol**. The plan below still says `bingo.example.com` in places.
 
 ---
 
@@ -70,9 +70,9 @@ The **public solo game on GitHub Pages stays exactly as it is now.** Together mo
 ## Architecture
 
 ```
-Browser (host)  ──┐                         ┌── Discord OAuth (sign-in only)
-Browser (player) ─┼─ https://bingo.example.com ── Cloudflare Tunnel ── server box:
-Browser (player) ─┘   (HTTP + WebSocket)         docker compose: [app: Node 22] + [cloudflared]
+Browser (host)  ──┐                     ┌── Discord OAuth (sign-in only)
+Browser (player) ─┼─ https://bingo.dkb.lol ── Cloudflare Tunnel "minisv2" ── server box (minisv2):
+Browser (player) ─┘   (HTTP + WebSocket)      host cloudflared → http://localhost:3030 → docker compose: [app: Node 22]
 ```
 
 - **Node 22**, with only three packages: **Express** (static files and sign-in routes), **Socket.IO** (live updates, reconnects and rooms) and **cookie-session** (a signed cookie holding the Discord id, name and avatar). Node 22 has `fetch` and `--env-file` built in.
@@ -107,17 +107,16 @@ TOGETHER_MODE_PLAN.md    this file
 
 ### Phase 0: Owner setup (only the owner can do these; the chat can guide)
 1. **Server box:** install Docker with the Compose plugin, git, and Node 22 for local testing. `gh` is optional, logged in as `bickersdaniel-stack`, so the chat can push.
-2. **Cloudflare:** the domain's DNS must be on Cloudflare; the free plan is fine. In Zero Trust, go to Networks → Tunnels and create a tunnel, then copy its **token**. Add a public hostname `bingo.example.com` pointing to service `http://app:3000`.
+2. **Cloudflare (done):** the box already runs the remotely managed tunnel **minisv2** as a host process (config in `/DATA/AppData/casaos-cloudflared/config/config.yml`). Its route `bingo.dkb.lol` points to `http://localhost:3030`, which docker-compose publishes on 127.0.0.1 only. So there's no cloudflared container and no tunnel token. An unused `dashcam-bingo` tunnel was made first and can be deleted.
 3. **Discord:** at https://discord.com/developers/applications, create an application called "Dashcam Bingo". Under OAuth2, copy the **Client ID**, reset and copy the **Client Secret**, and add two redirects:
    - `https://bingo.example.com/auth/discord/callback`
-   - `http://localhost:3000/auth/discord/callback` (for testing)
+   - `http://localhost:3300/auth/discord/callback` (for testing; port 3000 on the server box is taken by another app, so `npm run dev` uses 3300)
 4. **Secrets:** put them in `.env` on the server, copied from `.env.example`. Never commit this file. It needs:
    - `DISCORD_CLIENT_ID`
    - `DISCORD_CLIENT_SECRET`
    - `SESSION_SECRET` (any long random string)
    - `PUBLIC_URL=https://bingo.example.com`
    - `PORT=3000`
-   - `TUNNEL_TOKEN`
 5. **Testing:** testing with more than one player needs **a second Discord account**, or a friend.
 
 ### Phase 1: Restructure, solo game unchanged
@@ -148,7 +147,7 @@ TOGETHER_MODE_PLAN.md    this file
 - **`room.html` without a room code:** shows a "Sign in with Discord" button. After sign-in, it shows "Create a room" or "Join with code". It reuses the top bar, theme and colour menu, plus an avatar and Sign out at the right.
 - **Deploy:**
   - `Dockerfile`: `node:22-alpine`, `npm ci --omit=dev`, `node server/index.js`.
-  - `docker-compose.yml`: an `app` service (env_file `.env`, `restart: unless-stopped`), and a `cloudflared` service (pinned `cloudflare/cloudflared` version, `tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}`).
+  - `docker-compose.yml`: an `app` service (env_file `.env`, `restart: unless-stopped`) published on `127.0.0.1:3030`, which the host's minisv2 tunnel connects to.
 - **Done when:** https://bingo.example.com loads, Discord sign-in works, and the avatar and name show up.
 
 ### Phase 3: Rooms, players, live marking, wins (no video yet)
@@ -211,7 +210,7 @@ TOGETHER_MODE_PLAN.md    this file
 
 ## Verification
 - **Phase 1:** run any static server in `docs/` and compare with the live site on desktop (1280px) and phone (375px). Check light, dark and system themes, the colour menu and its Recent row, a win with its screenshot, click-to-copy, Clear Marks and Clear History. After pushing, check the github.io address again.
-- **Phases 2–4, locally:** run `npm run dev`, which is `node --env-file=.env --watch server/index.js`, and open http://localhost:3000.
+- **Phases 2–4, locally:** run `npm run dev`, which runs `node --env-file=.env --watch server/index.js` with `PORT=3300` and `PUBLIC_URL=http://localhost:3300`, and open http://localhost:3300.
   - Use a normal window plus a private window, signed in as two different Discord accounts.
   - Check: sign in and out, create and join by link, the player list, live spots with the pulse on matching squares, wins in both windows, refreshing to get the same card back, host-only controls, and the video timestamps and replay.
 - **Deployed:** run `docker compose up -d --build`, visit https://bingo.example.com, and check that sign-in works over HTTPS. In the browser's developer tools, check that the WebSocket connects through the tunnel. Test on a phone too.

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashcam Bingo Together</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="top-bar room-bar">
+        <div class="bar-side">
+            <button id="themeButton" class="pill theme-button" type="button" title="Switch between System, Light and Dark"></button>
+            <span class="edition">AU Edition</span>
+        </div>
+        <h1 class="bar-title">Dashcam Bingo</h1>
+        <div class="bar-side">
+            <label for="colourButton" class="picker-label">Colour Picker:</label>
+            <div class="colour-menu">
+                <button id="colourButton" class="pill colour-pill" type="button" aria-haspopup="true" aria-expanded="false" title="Pick the colour for marked squares">
+                    <span class="colour-dot"></span>
+                    <span class="colour-code" id="colourCode">#22C55E</span>
+                </button>
+                <div class="colour-popover" id="colourPopover" hidden>
+                    <p class="swatch-label">Colours</p>
+                    <div class="swatches" id="presetSwatches"></div>
+                    <div id="recentSection" hidden>
+                        <p class="swatch-label">Recent</p>
+                        <div class="swatches" id="recentSwatches"></div>
+                    </div>
+                    <label class="custom-colour">
+                        <input type="color" id="colorPicker" value="#22c55e">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+                        Custom colour
+                    </label>
+                </div>
+            </div>
+            <form class="account" id="account" method="post" action="/auth/logout" hidden>
+                <img class="avatar my-avatar" alt="">
+                <span class="account-name my-name"></span>
+                <button class="pill" type="submit" title="Sign out" aria-label="Sign out">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span class="signout-label">Sign out</span>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="stage">
+            <div class="ambient-glow"></div>
+            <div class="lobby" id="signedOut" hidden>
+                <h2>Play together</h2>
+                <p>Sign in with Discord to play in a room with your friends. Only your Discord name and picture are used.</p>
+                <a class="btn" href="/auth/discord">Sign in with Discord</a>
+            </div>
+            <div class="lobby" id="signedIn" hidden>
+                <img class="lobby-avatar my-avatar" alt="">
+                <h2>G'day, <span class="my-name"></span></h2>
+                <p>You're signed in. Rooms are coming next.</p>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="/room.js"></script>
+</body>
+</html>

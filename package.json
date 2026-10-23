@@ -1,0 +1,17 @@
+{
+  "name": "dashcam-bingo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "PORT=3300 PUBLIC_URL=http://localhost:3300 node --env-file=.env --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.1",
+    "express": "^5.3.0",
+    "socket.io": "^4.8.4"
+  }
+}

@@ -230,10 +230,14 @@ function joinRoom() {
     $("shareButton").hidden = !navigator.mediaDevices?.getDisplayMedia; // Phones can't share their screen
     $("shareButton").addEventListener("click", () => shareStream ? stopSharing(socket) : startSharing(socket));
     setUpSidebarResize();
+    setUpSidebarMin();
     $("soundButton").addEventListener("click", () => {
         $("liveVideo").muted = false;
         $("soundButton").hidden = true;
     });
+    const savedVolume = Number(load("streamVolume"));
+    if (savedVolume >= 0 && savedVolume <= 1) $("streamVolume").value = String(savedVolume);
+    $("streamVolume").addEventListener("input", applyStreamVolume);
     document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
     setInterval(() => state && showNowPlaying(), 1000);
 }
@@ -327,10 +331,60 @@ function arrange(withVideo) {
 }
 
 function selectTab(tab) {
+    const again = tab.getAttribute("aria-selected") === "true" && document.body.classList.contains("sidebar-pop");
     document.querySelectorAll(".tab").forEach(other => {
         other.setAttribute("aria-selected", other === tab);
         $(other.getAttribute("aria-controls")).hidden = other !== tab;
     });
+    if (!document.body.classList.contains("sidebar-min")) return;
+    document.body.classList.toggle("sidebar-pop", !again);
+    if (!again) placeSidebarPop();
+    else clearSidebarPopStyle();
+}
+
+function setSidebarMin(min) {
+    document.body.classList.toggle("sidebar-min", min);
+    document.body.classList.remove("sidebar-pop");
+    clearSidebarPopStyle();
+    $("sidebarMin").setAttribute("aria-pressed", min);
+    $("sidebarMin").textContent = min ? "Menu" : "Minimise";
+    $("sidebarMin").title = min ? "Show side menu" : "Minimise";
+    save("sidebarMin", min ? "1" : "");
+}
+
+function clearSidebarPopStyle() {
+    document.querySelectorAll("#sidebar .tab-panel").forEach(panel => {
+        panel.style.width = panel.style.left = panel.style.top = "";
+    });
+}
+
+function placeSidebarPop() {
+    const panel = document.querySelector("#sidebar .tab-panel:not([hidden])");
+    const tabs = document.querySelector("#sidebar .tabs");
+    if (!panel || !document.body.classList.contains("sidebar-pop")) return;
+    const box = tabs.getBoundingClientRect();
+    const width = Math.min(380, innerWidth - 24);
+    panel.style.width = `${width}px`;
+    panel.style.left = `${Math.max(12, box.right - width)}px`;
+    panel.style.top = `${Math.min(box.bottom + 8, innerHeight - 120)}px`;
+}
+
+function setUpSidebarMin() {
+    if (load("sidebarMin")) setSidebarMin(true);
+    $("sidebarMin").addEventListener("click", () => setSidebarMin(!document.body.classList.contains("sidebar-min")));
+    document.addEventListener("click", event => {
+        if (!document.body.classList.contains("sidebar-pop")) return;
+        if (event.target.closest("#sidebar")) return;
+        document.body.classList.remove("sidebar-pop");
+        clearSidebarPopStyle();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            document.body.classList.remove("sidebar-pop");
+            clearSidebarPopStyle();
+        }
+    });
+    window.addEventListener("resize", placeSidebarPop);
 }
 
 async function startPlayer(socket, video) {
@@ -428,12 +482,20 @@ function stopSharing(socket) {
     showSharing();
 }
 
-// When the host shares this tab, viewers get just the full-size player, not the host's card
+// Viewers get only the player. restrictTo leaves host dialogs off the stream; cropTo is the older fallback
 async function cropShare() {
     const track = shareStream?.getVideoTracks()[0];
-    const target = state.round.video ? $("playerSlot") : undefined;
+    if (!track) return;
+    const target = state.round.video ? $("playerSlot") : null;
     try {
-        await track?.cropTo(target ? await CropTarget.fromElement(target) : undefined);
+        if (target && typeof RestrictionTarget !== "undefined" && track.restrictTo) {
+            await track.restrictTo(await RestrictionTarget.fromElement(target));
+            return;
+        }
+        await track.restrictTo?.(null);
+    } catch (e) {}
+    try {
+        await track.cropTo(target ? await CropTarget.fromElement(target) : undefined);
     } catch (e) {} // Another tab was shared, or the browser can't crop: viewers see all of it
 }
 
@@ -565,13 +627,26 @@ function showLive(socket, stream) {
     if (stream === video.srcObject && !video.hidden === !!stream) return;
     video.srcObject = stream;
     video.hidden = !stream;
-    if (stream) video.play().catch(() => { // Sound needs a tap first, so start muted
-        video.muted = true;
-        video.play().catch(() => {});
-        $("soundButton").hidden = false;
-    });
+    $("streamControls").hidden = !stream;
+    if (stream) {
+        applyStreamVolume();
+        video.play().catch(() => { // Sound needs a tap first, so start muted
+            video.muted = true;
+            video.play().catch(() => {});
+            $("soundButton").hidden = false;
+        });
+    }
     $("soundButton").hidden = !stream || !video.muted;
     showVideo(socket);
+}
+
+function applyStreamVolume() {
+    const video = $("liveVideo");
+    const value = Number($("streamVolume").value);
+    video.volume = value;
+    if (value > 0) video.muted = false;
+    $("soundButton").hidden = !video.srcObject || !video.muted;
+    save("streamVolume", String(value));
 }
 
 function newPeer(socket, otherId) {

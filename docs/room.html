@@ -197,7 +197,10 @@
                 <div class="video-frame" id="videoFrame">
                     <div class="player-slot" id="playerSlot"></div>
                     <video id="liveVideo" autoplay playsinline muted hidden></video>
-                    <button class="pill sound-button" id="soundButton" type="button" hidden>🔊 Turn on sound</button>
+                    <div class="stream-controls" id="streamControls" hidden>
+                        <button class="pill sound-button" id="soundButton" type="button">🔊 Turn on sound</button>
+                        <input class="stream-volume" id="streamVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Stream volume">
+                    </div>
                 </div>
             </div>
 
@@ -231,6 +234,7 @@
                 <button class="tab" id="playersTab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
                 <button class="tab" id="feedTab" type="button" role="tab" aria-selected="false" aria-controls="feedPanel">Feed</button>
                 <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="winsPanel">Winning cards</button>
+                <button class="min-tab" id="sidebarMin" type="button" aria-pressed="false" title="Minimise">Minimise</button>
             </div>
             <div class="tab-panel" id="playersPanel" role="tabpanel">
                 <ul class="people" id="playerList"></ul>

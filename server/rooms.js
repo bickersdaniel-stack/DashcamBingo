@@ -225,6 +225,7 @@ export function setupRooms(io) {
 
 // The id changes every time, so marks meant for a replaced round can't land on the new cards
 function startRound(room, video = null, replace = false) {
+    video = continueVideo(room.round?.video, video); // Same dashcam clip, next bingo: keep watching from here
     const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
     room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard());
@@ -301,6 +302,11 @@ function stateFor(room, userId) {
 // A guess at where the host's video is now: their last report, plus the time since if it was playing
 function videoTimeNow(video) {
     return video.time + (video.playing ? (Date.now() - video.reportedAt) / 1000 : 0);
+}
+
+export function continueVideo(previous, next) {
+    if (!next || previous?.id !== next.id) return next;
+    return { ...next, title: previous.title || next.title, time: videoTimeNow(previous), playing: previous.playing, reportedAt: Date.now() };
 }
 
 function videoInfo(video) {

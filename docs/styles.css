@@ -989,6 +989,19 @@ a.btn {
     font-weight: 600;
     cursor: pointer;
 }
+.min-tab {
+    margin-left: auto;
+    padding: 12px 8px;
+    border: 0;
+    background: none;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.min-tab[aria-pressed="true"] {
+    color: var(--accent);
+}
 .tab[aria-selected="true"] {
     border-bottom-color: var(--stamp);
     color: var(--heading);
@@ -997,6 +1010,20 @@ a.btn {
     display: flex;
     flex-direction: column;
     min-height: 0;
+}
+body.sidebar-min:not(.sidebar-pop) .tab-panel {
+    display: none !important;
+}
+body.sidebar-min.sidebar-pop .tab-panel:not([hidden]) {
+    position: fixed;
+    z-index: 35;
+    width: min(380px, calc(100vw - 24px));
+    max-height: min(70vh, 560px);
+    overflow: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background-color: var(--surface);
+    box-shadow: 0 16px 48px var(--shadow);
 }
 .people, .feed {
     display: flex;
@@ -1184,6 +1211,7 @@ a.btn {
     top: 0;
     left: 0;
     transform-origin: top left;
+    isolation: isolate; /* Element capture can then leave host dialogs off the stream */
 }
 .player-slot:empty {
     inset: 0;
@@ -1201,10 +1229,18 @@ a.btn {
     background-color: #000;
     object-fit: contain;
 }
-.sound-button {
+.stream-controls {
     position: absolute;
     left: 16px;
     bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 1;
+}
+.stream-volume {
+    width: 110px;
+    accent-color: var(--accent);
 }
 .share-status {
     flex-basis: 100%;
@@ -1625,6 +1661,13 @@ a.btn {
     }
     .with-video .tab-panel {
         flex: none;
+    }
+    body.sidebar-min:not(.with-video) .sidebar {
+        width: auto;
+        align-self: flex-start;
+    }
+    body.sidebar-min:not(.with-video) .sidebar-handle {
+        display: none;
     }
 }
 @media (min-width: 1280px) {

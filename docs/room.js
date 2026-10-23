@@ -461,7 +461,7 @@ async function startPlayer(socket, video) {
             },
             onError: event => {
                 if (event.data === 2 || event.data === 100 || event.data === 101 || event.data === 150) {
-                    videoFailed(socket, video.id, event.data);
+                    videoFailed(socket, playerVideoId, event.data); // Not video.id: Change video loads other clips into this player
                 }
             }
         }

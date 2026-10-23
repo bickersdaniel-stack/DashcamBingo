@@ -137,6 +137,10 @@ button:focus-visible, .custom-colour:focus-within {
     background-color: var(--surface-3);
     border-color: var(--border-strong);
 }
+.pill:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 .theme-button .icon {
     color: var(--accent);
 }
@@ -460,11 +464,15 @@ a.btn {
 
 /* Winning cards */
 .sidebar {
+    position: relative;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     border-top: 1px solid var(--border);
     background-color: var(--surface);
+}
+.sidebar-handle {
+    display: none;
 }
 .sidebar-head {
     display: flex;
@@ -1104,10 +1112,28 @@ a.btn {
     position: relative;
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     width: 100%;
     max-width: 620px;
     margin: 0 auto 16px;
+}
+.quality-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.quality-select {
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
 }
 .link-input {
     flex: 1;
@@ -1153,7 +1179,18 @@ a.btn {
     background-color: #000;
     box-shadow: 0 25px 50px -12px var(--board-shadow);
 }
-.player-slot, .video-frame video {
+.player-slot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+}
+.player-slot:empty {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.video-frame video {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -1532,9 +1569,28 @@ a.btn {
         overflow-y: auto;
     }
     .sidebar {
-        width: 320px;
+        width: var(--sidebar-width, 320px);
         border-top: 0;
         border-left: 1px solid var(--border);
+    }
+    .sidebar-handle {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: -3px;
+        width: 8px;
+        height: 100%;
+        cursor: col-resize;
+        touch-action: none;
+        z-index: 2;
+    }
+    .sidebar-handle:hover,
+    .resizing-sidebar .sidebar-handle {
+        background-color: var(--accent);
+    }
+    .resizing-sidebar {
+        cursor: col-resize;
+        user-select: none;
     }
     .win-list {
         flex: 1;
@@ -1544,7 +1600,7 @@ a.btn {
 }
 @media (min-width: 1280px) {
     .sidebar {
-        width: 384px;
+        width: var(--sidebar-width, 384px);
     }
 }
 @media (min-width: 1024px) {
@@ -1556,7 +1612,7 @@ a.btn {
     }
     /* With the card on top, the host's sidebar is a little wider and scrolls as a whole */
     .with-video .sidebar {
-        width: 400px;
+        width: var(--sidebar-width, 400px);
         overflow-y: auto;
     }
     /* The video area never scrolls: the video is as big as fits under the link box */
@@ -1573,7 +1629,7 @@ a.btn {
 }
 @media (min-width: 1280px) {
     .with-video .sidebar {
-        width: 460px;
+        width: var(--sidebar-width, 460px);
     }
 }
 @media (max-width: 639px) {

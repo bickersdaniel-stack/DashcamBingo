@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "PORT=3300 PUBLIC_URL=http://localhost:3300 node --env-file=.env --watch server/index.js"
+    "dev": "PORT=3300 PUBLIC_URL=http://localhost:3300 node --env-file=.env --watch server/index.js",
+    "test": "node --test server/rerolls.test.js"
   },
   "engines": {
     "node": ">=22"

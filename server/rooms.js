@@ -26,7 +26,8 @@ export function setupRooms(io) {
             while (rooms.has(code));
             const room = {
                 code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
-                nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null
+                nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null,
+                rerolls: rerollsFrom(data?.rerolls) ?? 0
             };
             startRound(room, videoFrom(data));
             rooms.set(code, room);
@@ -88,6 +89,34 @@ export function setupRooms(io) {
             if (!untouched) room.lastRound = roundSummary(room);
             startRound(room, videoFrom(data), untouched);
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
+        });
+
+        socket.on("host:rerolls", data => {
+            const room = rooms.get(socket.data.code);
+            if (!room || room.hostId !== user.id) return;
+            const n = rerollsFrom(data?.rerolls);
+            if (n === null) return;
+            room.rerolls = n;
+            io.to(room.code).emit("rerolls:update", n);
+        });
+
+        socket.on("card:reroll", data => {
+            const room = rooms.get(socket.data.code);
+            const card = room?.round.cards.get(user.id);
+            if (!room || data?.round !== room.round.id || !canReroll(room, card)) return;
+            room.round.cards.set(user.id, Object.assign(dealCard(), { rerollsUsed: card.rerollsUsed + 1 }));
+            socket.emit("room:state", stateFor(room, user.id));
+            io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
+        });
+
+        // Swap the YouTube video without dealing new cards
+        socket.on("host:setVideo", data => {
+            const room = rooms.get(socket.data.code);
+            if (!room || room.hostId !== user.id) return;
+            const video = videoFrom(data);
+            if (!video) return;
+            room.round.video = video;
+            io.to(room.code).emit("video:update", videoInfo(video));
         });
 
         // The host's player says where it's up to, about once a second
@@ -210,7 +239,16 @@ function dealCard() {
     }
     const cardPhrases = deck.slice(0, 25);
     cardPhrases[12] = "FREE";
-    return { phrases: cardPhrases, marked: new Set(), bestLines: 0 };
+    return { phrases: cardPhrases, marked: new Set(), bestLines: 0, rerollsUsed: 0 };
+}
+
+export function rerollsFrom(value) {
+    const n = Number(value);
+    return Number.isInteger(n) && n >= 0 && n <= 9 ? n : null; // shortcut: cap 9 a round, raise if anyone wants more
+}
+
+export function canReroll(room, card) {
+    return !!card && (room.rerolls ?? 0) > 0 && (card.rerollsUsed ?? 0) < room.rerolls && card.marked.size === 0 && card.bestLines === 0;
 }
 
 // "Sam spotted ...": people spotting the same phrase within 30 seconds share one feed item
@@ -250,13 +288,13 @@ function playerInfo(room, player) {
 function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
     return {
-        code: room.code, hostId: room.hostId,
+        code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0,
         round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
-        card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines }
+        card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 

@@ -118,6 +118,20 @@
                         </h3>
                         <p>Paste the YouTube video you'll watch, or add one later.</p>
                         <input class="link-input" id="createLink" placeholder="YouTube link (optional)" autocomplete="off" spellcheck="false" aria-label="YouTube link for the first round">
+                        <label class="quality-label">Rerolls
+                            <select class="quality-select" id="createRerolls" aria-label="Rerolls per round">
+                                <option value="0">Off</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                                <option value="7">7</option>
+                                <option value="8">8</option>
+                                <option value="9">9</option>
+                            </select>
+                        </label>
                         <button class="btn btn-primary" id="createButton" type="submit">Create room</button>
                     </form>
                     <form class="lobby-card" id="joinForm">
@@ -149,6 +163,29 @@
             <form class="host-bar" id="hostBar" hidden>
                 <input class="link-input" id="videoLink" placeholder="Paste a YouTube link, or leave empty for no video" autocomplete="off" spellcheck="false" aria-label="YouTube link">
                 <button class="btn" type="submit">Start round</button>
+                <button class="btn btn-quiet" id="changeVideoButton" type="button">Change video</button>
+                <label class="quality-label">Quality
+                    <select class="quality-select" id="streamQuality" aria-label="Stream quality">
+                        <option value="auto">Auto</option>
+                        <option value="480">480p</option>
+                        <option value="720">720p</option>
+                        <option value="1080">1080p</option>
+                    </select>
+                </label>
+                <label class="quality-label">Rerolls
+                    <select class="quality-select" id="hostRerolls" aria-label="Rerolls per round">
+                        <option value="0">Off</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                    </select>
+                </label>
                 <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
                 <p class="share-status" id="shareStatus" hidden></p>
                 <p class="host-note" id="hostNote" hidden>
@@ -172,6 +209,10 @@
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                         <span id="copyInviteLabel">Copy invite link</span>
                     </button>
+                    <button class="pill" id="rerollButton" type="button" hidden>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span id="rerollLabel">Reroll</span>
+                    </button>
                 </div>
                 <p class="now-playing" id="nowPlaying" hidden>Now playing: <em id="nowPlayingTitle"></em> · <span id="nowPlayingTime"></span></p>
                 <div class="status-row">
@@ -185,6 +226,7 @@
         </section>
 
         <aside class="sidebar" id="sidebar" hidden>
+            <div class="sidebar-handle" id="sidebarHandle" role="separator" aria-orientation="vertical" aria-label="Resize side menu"></div>
             <div class="tabs" role="tablist">
                 <button class="tab" id="playersTab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
                 <button class="tab" id="feedTab" type="button" role="tab" aria-selected="false" aria-controls="feedPanel">Feed</button>

@@ -1,6 +1,6 @@
 // Together mode: Discord sign-in, then rooms where everyone's marks and wins show up live
 import { io } from "/socket.io/socket.io.esm.min.js";
-import { drawBoard, setCrossed, captureScreenshot } from "./core.js";
+import { drawBoard, setCrossed, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
 
@@ -23,11 +23,14 @@ let shareStream = null;    // Host: what they're sharing
 const viewers = new Map(); // Host: viewer's socket id -> their connection
 let watchPeer = null;      // Viewer: the connection to the host
 let watchingFrom = null;   // Viewer: the host's socket id
+const departed = new Map(); // People who left the room, so their old feed items keep their names
 
 if (me) {
     $("account").hidden = false;
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
+    setUpAccountMenu();
+    welcome();
 }
 
 if (!me) {
@@ -62,9 +65,13 @@ function showLobby() {
         $("lobbyError").hidden = false;
     };
 
-    $("createButton").addEventListener("click", () => {
+    $("createForm").addEventListener("submit", event => {
+        event.preventDefault();
+        const text = $("createLink").value.trim();
+        const video = text ? parseYouTubeLink(text) : null;
+        if (text && !video) return showError("That doesn't look like a YouTube link. Leave it empty to add a video later.");
         $("createButton").disabled = true;
-        socket.timeout(5000).emit("room:create", (timedOut, result) => {
+        socket.timeout(5000).emit("room:create", video ? { videoId: video.id, start: video.start } : {}, (timedOut, result) => {
             if (result?.code) return location.assign(`/r/${result.code}`);
             showError(result?.error ?? "Couldn't reach the server. Try again.");
             $("createButton").disabled = false;
@@ -96,6 +103,19 @@ function joinRoom() {
         showRoom(socket);
         // A new round while you're here: show how the last one went (not after a refresh or rejoin)
         if (previousRound && state.round.number > previousRound && state.lastRound) showScoreboard(state.lastRound);
+    });
+    socket.on("room:gone", message => leaveRoomView(socket, message)); // The host ended it, or you left in another tab
+    socket.on("player:left", id => {
+        if (!state) return;
+        const gone = state.players.find(player => player.id === id);
+        if (gone) departed.set(id, gone);
+        state.players = state.players.filter(player => player.id !== id);
+        showPlayers();
+    });
+    $("leaveButton").hidden = false;
+    $("leaveButton").addEventListener("click", () => socket.timeout(5000).emit("room:leave", () => location.assign("/")));
+    $("endRoomButton").addEventListener("click", () => {
+        if (confirm("End this room for everyone? Everyone goes back to the start.")) socket.timeout(5000).emit("room:end", () => location.assign("/"));
     });
     socket.on("room:host", hostId => {
         if (!state) return;
@@ -149,7 +169,8 @@ function joinRoom() {
         const text = $("videoLink").value.trim();
         const video = text ? parseYouTubeLink(text) : null;
         if (text && !video) return showHostMessage("That doesn't look like a YouTube link.");
-        if (!confirm(`Start a new round${video ? " with this video" : " without a video"}? Everyone gets a fresh card.`)) return;
+        const untouched = state.events.length === 0 && state.players.every(player => player.marked === 0);
+        if (!untouched && !confirm(`Start a new round${video ? " with this video" : " without a video"}? Everyone gets a fresh card.`)) return;
         $("hostNote").hidden = true;
         $("videoLink").value = "";
         socket.emit("host:newRound", video ? { videoId: video.id, start: video.start } : {});
@@ -205,6 +226,7 @@ function showVideo(socket) {
     const isHost = state.hostId === me.id;
     const hosting = isHost && !!state.round.video;
     $("hostBar").hidden = !isHost;
+    $("endRoomButton").hidden = !isHost;
     arrange(hosting || !$("liveVideo").hidden);
     if (hosting) startPlayer(socket, state.round.video);
     else stopPlayer();
@@ -434,10 +456,11 @@ function showFeed() {
         const text = el("span", "feed-text");
         if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
         else if (event.type === "host") text.append(`👑 ${names} is now the host`);
+        else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
         else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
 
         const avatars = el("span", "feed-avatars");
-        avatars.append(...ids.map(id => avatar(playerById(id))));
+        avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
         const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
         // The host can click a moment from this video to watch it again, from 5 seconds before
         const replayable = playerVideoId !== null && event.videoId === playerVideoId;
@@ -494,7 +517,7 @@ function stopPulse(index) {
 }
 
 function playerById(id) {
-    return state.players.find(player => player.id === id) ?? { name: "Someone", avatar: "https://cdn.discordapp.com/embed/avatars/0.png" };
+    return state.players.find(player => player.id === id) ?? departed.get(id) ?? { name: "Someone", avatar: "https://cdn.discordapp.com/embed/avatars/0.png" };
 }
 
 function avatar(player) {
@@ -513,4 +536,64 @@ function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60) % 60;
     const rest = String(seconds % 60).padStart(2, "0");
     return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+}
+
+// The room ended or you left it: stop everything and say why
+function leaveRoomView(socket, message) {
+    stopPlayer();
+    if (shareStream) stopSharing(socket);
+    watchPeer?.close();
+    watchPeer = null;
+    socket.disconnect();
+    arrange(false);
+    $("roomGoneTitle").textContent = "Room closed";
+    $("roomGoneText").textContent = message;
+    $("leaveButton").hidden = $("endRoomButton").hidden = true;
+    show("roomGone");
+}
+
+// Your picture opens the menu; clicking elsewhere or pressing Escape closes it
+function setUpAccountMenu() {
+    const setOpen = open => {
+        $("accountPanel").hidden = !open;
+        $("accountButton").setAttribute("aria-expanded", open);
+    };
+    $("accountButton").addEventListener("click", () => setOpen($("accountPanel").hidden));
+    document.addEventListener("click", event => {
+        // The path, not the target: the theme button redraws itself, so its clicked icon is gone by now
+        if (!event.composedPath().includes($("account"))) setOpen(false);
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") setOpen(false);
+    });
+}
+
+// First time on this device: pick light or dark and a colour. Anyone who already chose either skips it.
+function welcome() {
+    if (load("onboarded")) return;
+    save("onboarded", "1");
+    if (load("theme") || load("colour")) return;
+
+    const themeButtons = [...$("themeChoice").querySelectorAll("button")];
+    const showChoices = () => {
+        const current = load("theme") ?? "system";
+        themeButtons.forEach(button => button.setAttribute("aria-pressed", button.dataset.theme === current));
+        $("welcomeSwatches").querySelectorAll(".swatch").forEach(swatch => swatch.setAttribute("aria-pressed", swatch.dataset.colour === $("colorPicker").value));
+    };
+    themeButtons.forEach(button => button.addEventListener("click", () => {
+        setTheme(button.dataset.theme);
+        showChoices();
+    }));
+    $("welcomeSwatches").replaceChildren(...Object.entries(presetColours).map(([colour, name]) => {
+        const swatch = Object.assign(el("button", "swatch"), { type: "button", title: name });
+        swatch.dataset.colour = colour;
+        swatch.style.backgroundColor = colour;
+        swatch.addEventListener("click", () => {
+            pickColour(colour);
+            showChoices();
+        });
+        return swatch;
+    }));
+    showChoices();
+    $("onboarding").showModal();
 }

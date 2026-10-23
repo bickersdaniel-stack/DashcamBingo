@@ -27,14 +27,17 @@ let theme = themes.includes(load("theme")) ? load("theme") : "system";
 showTheme();
 darkQuery.addEventListener("change", showTheme); // Follow the device when it switches, if on System
 
-themeButton.addEventListener("click", () => {
-    theme = themes[(themes.indexOf(theme) + 1) % themes.length];
+themeButton.addEventListener("click", () => setTheme(themes[(themes.indexOf(theme) + 1) % themes.length]));
+
+export function setTheme(name) {
+    theme = name;
     save("theme", theme);
     showTheme();
-});
+}
 
-// Colour menu: preset colours, the last 5 picked on this device, and a custom picker
-const presetColours = {
+// Colour menu: preset colours, the last 5 picked on this device, and a custom picker.
+// The room page shows the swatches inside its account menu, so there's no colour button or pop-up there.
+export const presetColours = {
     "#22c55e": "Green", "#14b8a6": "Teal", "#06b6d4": "Cyan", "#3b82f6": "Blue", "#6366f1": "Indigo",
     "#a855f7": "Purple", "#ec4899": "Pink", "#ef4444": "Red", "#f97316": "Orange", "#eab308": "Yellow"
 };
@@ -48,7 +51,7 @@ if (isHex(savedColour)) colorPicker.value = savedColour;
 setStampColour(colorPicker.value);
 showSwatches();
 
-colourButton.addEventListener("click", () => setColourMenuOpen(colourPopover.hidden));
+colourButton?.addEventListener("click", () => setColourMenuOpen(colourPopover.hidden));
 
 // Close the menu when clicking elsewhere or pressing Escape
 document.addEventListener("click", (event) => {
@@ -75,11 +78,12 @@ document.getElementById("clearHistoryButton")?.addEventListener("click", () => {
 });
 
 function setColourMenuOpen(open) {
+    if (!colourPopover) return;
     colourPopover.hidden = !open;
     colourButton.setAttribute("aria-expanded", open);
 }
 
-function pickColour(colour) {
+export function pickColour(colour) {
     colorPicker.value = colour;
     setStampColour(colour);
     save("colour", colour);
@@ -117,11 +121,11 @@ function showTheme() {
 }
 
 // Saved settings live in this browser only; ignore errors if storage is blocked
-function load(key) {
+export function load(key) {
     try { return localStorage.getItem("dashcamBingo." + key); } catch (e) { return null; }
 }
 
-function save(key, value) {
+export function save(key, value) {
     try { localStorage.setItem("dashcamBingo." + key, value); } catch (e) {}
 }
 
@@ -136,7 +140,7 @@ function setStampColour(colour) {
     root.setProperty("--stamp-ambient", `rgba(${r}, ${g}, ${b}, 0.12)`);
     // Dark text on light colours, white text on dark ones
     root.setProperty("--stamp-text", (r * 299 + g * 587 + b * 114) / 1000 > 128 ? "#0b0d10" : "#ffffff");
-    colourCode.textContent = colour;
+    if (colourCode) colourCode.textContent = colour;
 }
 
 // Draws a card from the first 25 phrases (index 12 is the FREE square); onMark runs after each tap

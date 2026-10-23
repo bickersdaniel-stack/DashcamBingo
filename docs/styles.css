@@ -20,6 +20,7 @@
     --text-faint: #64748b;
     --accent: #059669;
     --amber: #b45309;
+    --danger: #dc2626;
     --shadow: rgba(15, 23, 42, 0.12);
     --chip-bg: rgba(15, 23, 42, 0.05);
     --empty-bg: #f8fafc;
@@ -53,6 +54,7 @@
     --text-faint: #64748b;
     --accent: #34d399;
     --amber: #fbbf24;
+    --danger: #f87171;
     --shadow: rgba(0, 0, 0, 0.35);
     --chip-bg: rgba(255, 255, 255, 0.05);
     --empty-bg: rgba(11, 13, 16, 0.4);
@@ -599,21 +601,120 @@ button:focus-visible, .custom-colour:focus-within {
     color: var(--cell-text);
 }
 
-/* Together mode: who's signed in, and the lobby card */
-.account {
+/* Together mode: your picture opens a menu with the look settings, and leaving or signing out */
+.account-menu {
+    position: relative;
+}
+.account-button {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 0;
+    padding: 4px 10px 4px 4px;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background-color: var(--surface-2);
+    color: var(--cell-text);
     font-size: 12px;
     font-weight: 600;
-    color: var(--cell-text);
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+.account-button:hover, .account-button[aria-expanded="true"] {
+    border-color: var(--border-strong);
+    background-color: var(--surface-3);
+}
+.account-button .icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-faint);
 }
 .account-name {
-    max-width: 120px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.account-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 50;
+    width: min(280px, calc(100vw - 32px));
+    box-sizing: border-box;
+    padding: 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    background-color: var(--surface);
+    box-shadow: 0 12px 32px var(--shadow);
+}
+.account-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.account-head .avatar {
+    width: 40px;
+    height: 40px;
+}
+.account-head div {
+    min-width: 0;
+}
+.account-head strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--heading);
+}
+.account-head span {
+    font-size: 11px;
+    color: var(--text-faint);
+}
+.menu-label {
+    margin: 14px 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+.account-panel .swatches {
+    margin-bottom: 10px;
+}
+.menu-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+.menu-actions form {
+    margin: 0;
+}
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--cell-text);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.menu-item:hover {
+    background-color: var(--surface-3);
+    color: var(--heading);
+}
+.menu-item.danger, .menu-item.danger:hover {
+    color: var(--danger);
 }
 .avatar {
     width: 28px;
@@ -658,11 +759,73 @@ button:focus-visible, .custom-colour:focus-within {
     border-radius: 50%;
     box-shadow: 0 0 0 3px var(--stamp);
 }
-.join-form {
+/* The greeting screen: say hello, then host a room or join one */
+.lobby-wide {
+    max-width: 760px;
+    text-align: left;
+}
+.lobby-hello {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+.lobby-hello .lobby-avatar {
+    flex-shrink: 0;
+    margin: 0;
+}
+.lobby .lobby-hello p {
+    margin: 0;
+}
+.lobby-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+.lobby-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-2);
+}
+.lobby-card h3 {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    margin-top: 16px;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--heading);
+}
+.lobby-card h3 .icon {
+    width: 18px;
+    height: 18px;
+    color: var(--stamp);
+}
+.lobby .lobby-card p {
+    flex: 1;
+    margin: 0;
+    font-size: 13px;
+}
+.lobby-card .link-input, .lobby-card .code-input {
+    flex: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+.lobby-card .btn {
+    justify-content: center;
+}
+.btn-primary, .btn-primary:hover {
+    border-color: transparent;
+    background-color: var(--stamp);
+    color: var(--stamp-text);
+    box-shadow: 0 4px 14px var(--stamp-glow);
+}
+.btn-primary:hover {
+    filter: brightness(1.08);
 }
 .code-input {
     width: 110px;
@@ -944,6 +1107,97 @@ button:focus-visible, .custom-colour:focus-within {
 .with-video .sidebar .bingo-cell {
     border-radius: 8px;
 }
+/* First visit: pick light or dark and a colour */
+.onboarding {
+    width: min(420px, calc(100vw - 32px));
+    box-sizing: border-box;
+    padding: 28px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: var(--text);
+    text-align: center;
+    box-shadow: 0 25px 50px -12px var(--board-shadow);
+}
+.onboarding::backdrop {
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+.onboarding h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--heading);
+}
+.onboarding p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.onboarding .menu-label {
+    margin: 18px 0 8px;
+}
+.onboarding .swatches {
+    justify-content: center;
+    margin: 0;
+}
+.theme-choice {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background-color: var(--surface-2);
+}
+.theme-choice button {
+    padding: 7px 16px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.theme-choice button[aria-pressed="true"] {
+    background-color: var(--surface);
+    color: var(--heading);
+    box-shadow: 0 1px 3px var(--shadow);
+}
+.sample-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 18px 0 22px;
+}
+.sample-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 64px;
+    box-sizing: border-box;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--cell-bg);
+    color: var(--cell-text);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+}
+.sample-cell.marked {
+    border-color: transparent;
+    background-color: var(--stamp);
+    color: var(--stamp-text);
+    font-weight: 600;
+    box-shadow: 0 0 14px var(--stamp-glow);
+}
+.onboarding form {
+    display: flex;
+    justify-content: center;
+}
+
 /* Results of the round that just ended */
 .scoreboard {
     width: min(480px, calc(100vw - 32px));
@@ -1133,19 +1387,9 @@ button:focus-visible, .custom-colour:focus-within {
         display: none;
     }
 }
-/* The together mode bar also holds the account, so it drops labels sooner */
-@media (max-width: 1279px) {
-    .account-name {
-        display: none;
-    }
-}
-@media (max-width: 1023px) {
-    .room-bar .picker-label, .signout-label {
-        display: none;
-    }
-}
+/* Phones: just your picture in the bar */
 @media (max-width: 639px) {
-    .account .avatar, .room-bar .colour-code {
+    .account-name {
         display: none;
     }
 }

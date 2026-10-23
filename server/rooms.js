@@ -19,7 +19,8 @@ export function setupRooms(io) {
         const user = socket.request.session.user;
         socket.data.userId = user.id;
 
-        socket.on("room:create", reply => {
+        // The host can give the video when creating the room, so round 1 starts with it
+        socket.on("room:create", (data, reply) => {
             if (typeof reply !== "function") return;
             if (rooms.size >= maxRooms) return reply({ error: "Too many rooms are open right now. Try again later." });
             let code;
@@ -29,7 +30,7 @@ export function setupRooms(io) {
                 code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
                 nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null
             };
-            startRound(room);
+            startRound(room, videoFrom(data));
             rooms.set(code, room);
             reply({ code });
         });
@@ -84,12 +85,10 @@ export function setupRooms(io) {
         socket.on("host:newRound", async data => {
             const room = rooms.get(socket.data.code);
             if (!room || room.hostId !== user.id) return;
-            const videoId = videoIdPattern.test(data?.videoId) ? data.videoId : null;
-            const start = Number.isFinite(data?.start) ? Math.min(Math.max(data.start, 0), maxVideoSeconds) : 0;
             // A round nobody has touched yet (like a new room's first) is replaced, keeping its number and skipping results
             const untouched = room.round.events.length === 0 && [...room.round.cards.values()].every(card => card.marked.size === 0);
             if (!untouched) room.lastRound = roundSummary(room);
-            startRound(room, videoId && { id: videoId, title: "", time: start, playing: false, reportedAt: Date.now() }, untouched);
+            startRound(room, videoFrom(data), untouched);
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
         });
 
@@ -111,6 +110,46 @@ export function setupRooms(io) {
             if (!room?.round.video || room.hostId !== user.id) return;
             room.round.video = null;
             io.to(room.code).emit("video:update", null);
+        });
+
+        // Leaving takes you out of the room on every tab; a host who leaves hands over straight away
+        socket.on("room:leave", reply => {
+            const room = rooms.get(socket.data.code);
+            if (!room) return typeof reply === "function" && reply();
+            if (io.sockets.sockets.get(room.streamSocket)?.data.userId === user.id) endStream(io, room);
+            for (const other of io.sockets.sockets.values()) {
+                if (other.data.code !== room.code || other.data.userId !== user.id) continue;
+                other.data.code = null;
+                other.leave(room.code);
+                if (other !== socket) other.emit("room:gone", "You left this room in another tab.");
+            }
+            room.players.delete(user.id);
+            room.connections.delete(user.id);
+            room.round.cards.delete(user.id);
+            if (room.players.size === 0) rooms.delete(room.code);
+            else {
+                io.to(room.code).emit("player:left", user.id);
+                addEvent(io, room, { type: "left", userId: user.id, name: user.name, avatar: user.avatar });
+                if (room.hostId === user.id) {
+                    room.hostAwaySince = 0; // Counts as gone long enough
+                    checkHost(io, room);
+                }
+            }
+            if (typeof reply === "function") reply();
+        });
+
+        // The host can end the room for everyone
+        socket.on("room:end", reply => {
+            const room = rooms.get(socket.data.code);
+            if (!room || room.hostId !== user.id) return;
+            for (const other of io.sockets.sockets.values()) {
+                if (other.data.code !== room.code) continue;
+                other.data.code = null;
+                other.leave(room.code);
+                if (other !== socket) other.emit("room:gone", "The host ended this room.");
+            }
+            rooms.delete(room.code);
+            if (typeof reply === "function") reply();
         });
 
         // The host shares their video straight to each viewer's browser (WebRTC); this server only passes
@@ -234,7 +273,7 @@ function videoInfo(video) {
 
 // After the host has been gone a minute, whoever here joined the room first takes over (a refresh doesn't reset that)
 function checkHost(io, room) {
-    if (!room.hostAwaySince || Date.now() - room.hostAwaySince < handoverMs) return;
+    if (room.hostAwaySince === null || Date.now() - room.hostAwaySince < handoverMs) return;
     const next = [...room.players.values()]
         .filter(player => player.id !== room.hostId && room.connections.get(player.id) > 0)
         .sort((a, b) => a.joinedAt - b.joinedAt)[0];
@@ -272,4 +311,11 @@ function roundSummary(room) {
 function endStream(io, room) {
     room.streamSocket = null;
     io.to(room.code).emit("stream:live", null);
+}
+
+// The host's YouTube video for a new round, if they gave a valid one
+function videoFrom(data) {
+    if (!videoIdPattern.test(data?.videoId)) return null;
+    const start = Number.isFinite(data.start) ? Math.min(Math.max(data.start, 0), maxVideoSeconds) : 0;
+    return { id: data.videoId, title: "", time: start, playing: false, reportedAt: Date.now() };
 }

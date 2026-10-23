@@ -21,22 +21,31 @@
 <body>
     <header class="top-bar room-bar">
         <div class="bar-side">
-            <button id="themeButton" class="pill theme-button" type="button" title="Switch between System, Light and Dark"></button>
             <span class="edition">AU Edition</span>
         </div>
         <h1 class="bar-title">Dashcam Bingo</h1>
         <div class="bar-side">
-            <label for="colourButton" class="picker-label">Colour Picker:</label>
-            <div class="colour-menu">
-                <button id="colourButton" class="pill colour-pill" type="button" aria-haspopup="true" aria-expanded="false" title="Pick the colour for marked squares">
-                    <span class="colour-dot"></span>
-                    <span class="colour-code" id="colourCode">#22C55E</span>
+            <!-- Your picture opens a menu with the look settings and leaving or signing out -->
+            <div class="account-menu" id="account" hidden>
+                <button class="account-button" id="accountButton" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountPanel">
+                    <img class="avatar my-avatar" alt="">
+                    <span class="account-name my-name"></span>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9l-7 7-7-7"/></svg>
                 </button>
-                <div class="colour-popover" id="colourPopover" hidden>
-                    <p class="swatch-label">Colours</p>
+                <div class="account-panel" id="accountPanel" hidden>
+                    <div class="account-head">
+                        <img class="avatar my-avatar" alt="">
+                        <div>
+                            <strong class="my-name"></strong>
+                            <span>Signed in with Discord</span>
+                        </div>
+                    </div>
+                    <p class="menu-label">Theme</p>
+                    <button id="themeButton" class="pill theme-button" type="button" title="Switch between System, Light and Dark"></button>
+                    <p class="menu-label">Colour for marked squares</p>
                     <div class="swatches" id="presetSwatches"></div>
                     <div id="recentSection" hidden>
-                        <p class="swatch-label">Recent</p>
+                        <p class="menu-label">Recent</p>
                         <div class="swatches" id="recentSwatches"></div>
                     </div>
                     <label class="custom-colour">
@@ -44,16 +53,24 @@
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
                         Custom colour
                     </label>
+                    <div class="menu-actions">
+                        <button class="menu-item" id="leaveButton" type="button" hidden>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                            Leave room
+                        </button>
+                        <button class="menu-item danger" id="endRoomButton" type="button" hidden>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                            End room for everyone
+                        </button>
+                        <form method="post" action="/auth/logout">
+                            <button class="menu-item" type="submit">
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                Sign out
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
-            <form class="account" id="account" method="post" action="/auth/logout" hidden>
-                <img class="avatar my-avatar" alt="">
-                <span class="account-name my-name"></span>
-                <button class="pill" type="submit" title="Sign out" aria-label="Sign out">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    <span class="signout-label">Sign out</span>
-                </button>
-            </form>
         </div>
     </header>
 
@@ -65,19 +82,38 @@
                 <p id="signInText">Sign in with Discord to play in a room with your friends. Only your Discord name and picture are used.</p>
                 <a class="btn" id="signInLink" href="/auth/discord">Sign in with Discord</a>
             </div>
-            <div class="lobby" id="lobby" hidden>
-                <img class="lobby-avatar my-avatar" alt="">
-                <h2>G'day, <span class="my-name"></span></h2>
-                <p>Start a room and share its link, or join one with its code.</p>
-                <button class="btn" id="createButton" type="button">Create a room</button>
-                <form class="join-form" id="joinForm">
-                    <input class="code-input" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
-                    <button class="btn btn-quiet" type="submit">Join</button>
-                </form>
+            <div class="lobby lobby-wide" id="lobby" hidden>
+                <div class="lobby-hello">
+                    <img class="lobby-avatar my-avatar" alt="">
+                    <div>
+                        <h2>G'day, <span class="my-name"></span></h2>
+                        <p>Ready for some dashcam bingo? Host a room for your mates, or jump into theirs.</p>
+                    </div>
+                </div>
+                <div class="lobby-options">
+                    <form class="lobby-card" id="createForm">
+                        <h3>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Host a room
+                        </h3>
+                        <p>Paste the YouTube video you'll watch, or add one later.</p>
+                        <input class="link-input" id="createLink" placeholder="YouTube link (optional)" autocomplete="off" spellcheck="false" aria-label="YouTube link for the first round">
+                        <button class="btn btn-primary" id="createButton" type="submit">Create room</button>
+                    </form>
+                    <form class="lobby-card" id="joinForm">
+                        <h3>
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                            Join a room
+                        </h3>
+                        <p>Type the 5-character code, or just open the invite link.</p>
+                        <input class="code-input" id="joinCode" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+                        <button class="btn" type="submit">Join room</button>
+                    </form>
+                </div>
                 <p class="lobby-error" id="lobbyError" hidden></p>
             </div>
             <div class="lobby" id="roomGone" hidden>
-                <h2>Room not found</h2>
+                <h2 id="roomGoneTitle">Room not found</h2>
                 <p id="roomGoneText"></p>
                 <a class="btn" href="/">Back to start</a>
             </div>
@@ -150,6 +186,28 @@
             </div>
         </aside>
     </main>
+
+    <dialog class="onboarding" id="onboarding" aria-labelledby="onboardingTitle">
+        <img class="lobby-avatar my-avatar" alt="">
+        <h2 id="onboardingTitle">Welcome, <span class="my-name"></span>!</h2>
+        <p>Make it yours. You can change these any time from your picture in the top corner.</p>
+        <p class="menu-label">Theme</p>
+        <div class="theme-choice" id="themeChoice">
+            <button type="button" data-theme="system">System</button>
+            <button type="button" data-theme="light">Light</button>
+            <button type="button" data-theme="dark">Dark</button>
+        </div>
+        <p class="menu-label">Colour for marked squares</p>
+        <div class="swatches" id="welcomeSwatches"></div>
+        <div class="sample-row" aria-hidden="true">
+            <span class="sample-cell">Truck at fault</span>
+            <span class="sample-cell marked">Ute driver</span>
+            <span class="sample-cell">No indicator</span>
+        </div>
+        <form method="dialog">
+            <button class="btn btn-primary" type="submit">Let's go</button>
+        </form>
+    </dialog>
 
     <dialog class="scoreboard" id="scoreboard" aria-labelledby="scoreboardTitle">
         <h2 id="scoreboardTitle"></h2>

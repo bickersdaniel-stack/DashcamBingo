@@ -9,6 +9,7 @@ export const auth = Router();
 
 auth.get("/auth/discord", (req, res) => {
     req.session.state = randomBytes(16).toString("hex"); // Proves the callback came from this sign-in
+    req.session.next = /^\/r\/[A-Z0-9]{5}$/.test(req.query.next) ? req.query.next : undefined; // Back to the room link, never another site
     const params = new URLSearchParams({
         client_id: DISCORD_CLIENT_ID, response_type: "code", scope: "identify", redirect_uri: redirectUri, state: req.session.state
     });
@@ -18,8 +19,10 @@ auth.get("/auth/discord", (req, res) => {
 auth.get("/auth/discord/callback", async (req, res) => {
     const { code, state } = req.query;
     const expected = req.session.state;
+    const next = req.session.next ?? "/";
     delete req.session.state;
-    if (!code) return res.redirect("/"); // Pressed Cancel on Discord
+    delete req.session.next;
+    if (!code) return res.redirect(next); // Pressed Cancel on Discord
     if (!expected || state !== expected) return res.status(400).send("Sign-in expired. Go back and try again.");
 
     try {
@@ -38,7 +41,7 @@ auth.get("/auth/discord/callback", async (req, res) => {
         const me = await meResponse.json();
 
         req.session.user = { id: me.id, name: me.global_name ?? me.username, avatar: avatarUrl(me) };
-        res.redirect("/");
+        res.redirect(next);
     } catch (error) {
         console.error(error);
         res.status(502).send("Couldn't sign in with Discord. Go back and try again.");

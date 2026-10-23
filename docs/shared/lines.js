@@ -9,3 +9,8 @@ export const WINNING_LINES = [
 export function countLines(marked) {
     return WINNING_LINES.filter(line => line.every(i => i === 12 || marked.has(i))).length;
 }
+
+// True when some line needs just one more square
+export function isOneAway(marked) {
+    return WINNING_LINES.some(line => line.filter(i => i !== 12 && !marked.has(i)).length === 1);
+}

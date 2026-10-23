@@ -658,6 +658,176 @@ button:focus-visible, .custom-colour:focus-within {
     border-radius: 50%;
     box-shadow: 0 0 0 3px var(--stamp);
 }
+.join-form {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+.code-input {
+    width: 110px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background-color: var(--surface-2);
+    color: var(--heading);
+    font: 700 14px ui-monospace, Consolas, monospace;
+    letter-spacing: 0.15em;
+    text-align: center;
+    text-transform: uppercase;
+}
+.code-input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.lobby .lobby-error {
+    margin-top: 16px;
+    color: var(--amber);
+}
+
+/* Together mode room: code and invite above the board, tabs in the sidebar */
+.room-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 12px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.room-code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--heading);
+}
+.round-number {
+    flex: 1;
+}
+.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0;
+    border-bottom: 1px solid var(--border);
+}
+.tab {
+    padding: 12px 10px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.tab[aria-selected="true"] {
+    border-bottom-color: var(--stamp);
+    color: var(--heading);
+}
+.tab-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.people, .feed {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 16px;
+    list-style: none;
+}
+.person, .feed-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface-2);
+    font-size: 13px;
+    animation: pop-in 0.25s ease-out;
+}
+.person.away {
+    opacity: 0.45;
+}
+.person-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text);
+}
+.person-meta, .feed-time {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+.wins {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--amber);
+}
+.badge {
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background-color: var(--stamp);
+    color: var(--stamp-text);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.feed-avatars {
+    display: flex;
+    flex-shrink: 0;
+}
+.feed-avatars .avatar {
+    box-shadow: 0 0 0 2px var(--surface-2);
+}
+.feed-avatars .avatar + .avatar {
+    margin-left: -10px;
+}
+.feed-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+    color: var(--cell-text);
+}
+.feed-text em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--heading);
+}
+.feed-item.win {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.feed-empty {
+    margin: 0;
+    padding: 0 24px 24px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-faint);
+}
+/* Someone else just spotted this one: glow with their picture in the corner */
+.bingo-cell.spotted {
+    border-color: var(--stamp);
+    animation: spotted 1.2s ease-in-out infinite;
+}
+.spot-avatar {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--stamp);
+}
 
 /* Wide screens: winning cards become a full-height column on the right */
 @media (min-width: 1024px) {
@@ -686,6 +856,22 @@ button:focus-visible, .custom-colour:focus-within {
 @media (min-width: 1280px) {
     .sidebar {
         width: 384px;
+    }
+}
+@media (min-width: 1024px) {
+    .tab-panel {
+        flex: 1;
+    }
+    .people, .feed {
+        overflow-y: auto;
+    }
+}
+@media (max-width: 639px) {
+    .spot-avatar {
+        top: 2px;
+        left: 2px;
+        width: 13px;
+        height: 13px;
     }
 }
 @media (max-width: 767px) {
@@ -756,6 +942,9 @@ button:focus-visible, .custom-colour:focus-within {
 }
 @keyframes pop-in {
     from { transform: scale(0.92); opacity: 0.6; }
+}
+@keyframes spotted {
+    50% { box-shadow: 0 0 0 3px var(--stamp-glow); }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::after {

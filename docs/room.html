@@ -62,17 +62,78 @@
             <div class="ambient-glow"></div>
             <div class="lobby" id="signedOut" hidden>
                 <h2>Play together</h2>
-                <p>Sign in with Discord to play in a room with your friends. Only your Discord name and picture are used.</p>
-                <a class="btn" href="/auth/discord">Sign in with Discord</a>
+                <p id="signInText">Sign in with Discord to play in a room with your friends. Only your Discord name and picture are used.</p>
+                <a class="btn" id="signInLink" href="/auth/discord">Sign in with Discord</a>
             </div>
-            <div class="lobby" id="signedIn" hidden>
+            <div class="lobby" id="lobby" hidden>
                 <img class="lobby-avatar my-avatar" alt="">
                 <h2>G'day, <span class="my-name"></span></h2>
-                <p>You're signed in. Rooms are coming next.</p>
+                <p>Start a room and share its link, or join one with its code.</p>
+                <button class="btn" id="createButton" type="button">Create a room</button>
+                <form class="join-form" id="joinForm">
+                    <input class="code-input" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+                    <button class="btn btn-quiet" type="submit">Join</button>
+                </form>
+                <p class="lobby-error" id="lobbyError" hidden></p>
+            </div>
+            <div class="lobby" id="roomGone" hidden>
+                <h2>Room not found</h2>
+                <p id="roomGoneText"></p>
+                <a class="btn" href="/">Back to start</a>
+            </div>
+
+            <div class="board-wrap" id="game" hidden>
+                <div class="room-head">
+                    <span>Room <span class="room-code" id="roomCode"></span></span>
+                    <span class="round-number" id="roundNumber"></span>
+                    <button class="pill" id="copyInviteButton" type="button">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                        <span id="copyInviteLabel">Copy invite link</span>
+                    </button>
+                    <button class="pill" id="newRoundButton" type="button" hidden>New round</button>
+                </div>
+                <div class="status-row">
+                    <span class="bingo-alert" id="bingoAlert" hidden>🎉 Bingo winner!</span>
+                </div>
+                <div id="bingoCardContainer">
+                    <div class="shot-title">Dashcam Bingo</div>
+                    <div class="bingo-card" id="bingoCard"></div>
+                </div>
             </div>
         </section>
+
+        <aside class="sidebar" id="sidebar" hidden>
+            <div class="tabs" role="tablist">
+                <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
+                <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="feedPanel">Feed</button>
+                <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="winsPanel">Winning cards</button>
+            </div>
+            <div class="tab-panel" id="playersPanel" role="tabpanel">
+                <ul class="people" id="playerList"></ul>
+            </div>
+            <div class="tab-panel" id="feedPanel" role="tabpanel" hidden>
+                <ul class="feed" id="feedList"></ul>
+                <p class="feed-empty" id="feedEmpty">Nothing spotted yet. When someone marks a square, it shows up here.</p>
+            </div>
+            <div class="tab-panel" id="winsPanel" role="tabpanel" hidden>
+                <div class="win-list" id="gallery">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                        </div>
+                        <p class="empty-title">No winning rounds yet</p>
+                        <p class="empty-hint">Complete any row, column, or diagonal line to claim a winning card.</p>
+                    </div>
+                </div>
+                <div class="sidebar-foot">
+                    <span class="count" id="winCount">0 winning cards</span>
+                    <button id="clearHistoryButton" class="link-button" type="button">Clear History</button>
+                </div>
+            </div>
+        </aside>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script type="module" src="/room.js"></script>
 </body>
 </html>

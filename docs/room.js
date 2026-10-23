@@ -17,6 +17,12 @@ let player = null;        // The host's YouTube player
 let playerVideoId = null;
 let reportTimer = null;
 let youTube = null;       // YouTube's player script, loaded once when the host first needs it
+// The live stream goes straight from the host's browser to each viewer's (WebRTC); the server only introduces them
+const iceServers = [{ urls: "stun:stun.cloudflare.com:3478" }, { urls: "stun:stun.l.google.com:19302" }];
+let shareStream = null;    // Host: what they're sharing
+const viewers = new Map(); // Host: viewer's socket id -> their connection
+let watchPeer = null;      // Viewer: the connection to the host
+let watchingFrom = null;   // Viewer: the host's socket id
 
 if (me) {
     $("account").hidden = false;
@@ -120,6 +126,17 @@ function joinRoom() {
         if (video) showNowPlaying();
         else showVideo(socket); // The host's video couldn't play, so the round counts from its start
     });
+    socket.on("stream:live", from => {
+        if (!state) return;
+        state.streamFrom = from;
+        watch(socket);
+    });
+    socket.on("rtc:signal", ({ from, data }) => {
+        if (shareStream && data?.type === "hello") return sendStream(socket, from);
+        const peer = shareStream ? viewers.get(from) : from === watchingFrom ? watchPeer : null;
+        if (peer) handleSignal(socket, peer, from, data);
+    });
+    socket.on("rtc:left", dropViewer);
 
     $("copyInviteButton").addEventListener("click", () => {
         navigator.clipboard.writeText(`${location.origin}/r/${state.code}`).then(() => {
@@ -136,6 +153,12 @@ function joinRoom() {
         $("hostNote").hidden = true;
         $("videoLink").value = "";
         socket.emit("host:newRound", video ? { videoId: video.id, start: video.start } : {});
+    });
+    $("shareButton").hidden = !navigator.mediaDevices?.getDisplayMedia; // Phones can't share their screen
+    $("shareButton").addEventListener("click", () => shareStream ? stopSharing(socket) : startSharing(socket));
+    $("soundButton").addEventListener("click", () => {
+        $("liveVideo").muted = false;
+        $("soundButton").hidden = true;
     });
     document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
     setInterval(() => state && showNowPlaying(), 1000);
@@ -165,6 +188,8 @@ function showRoom(socket) {
     showVideo(socket);
     showPlayers();
     showFeed();
+    if (shareStream && state.streamFrom !== socket.id) socket.emit("stream:start"); // Back after a dropped connection
+    watch(socket);
 }
 
 function checkBingo() {
@@ -180,17 +205,19 @@ function showVideo(socket) {
     const isHost = state.hostId === me.id;
     const hosting = isHost && !!state.round.video;
     $("hostBar").hidden = !isHost;
-    arrange(hosting);
+    arrange(hosting || !$("liveVideo").hidden);
     if (hosting) startPlayer(socket, state.round.video);
     else stopPlayer();
+    if (shareStream) cropShare();
     showNowPlaying();
 }
 
-// A host playing a video gets it large on the left, and their card above the tabs on the right
-function arrange(hosting) {
-    document.body.classList.toggle("hosting", hosting);
-    $("videoColumn").hidden = !hosting;
-    if (hosting) $("sidebar").prepend($("game"));
+// A host playing a video, or a viewer watching the host's stream, gets it large on the left
+// and their card above the tabs on the right
+function arrange(withVideo) {
+    document.body.classList.toggle("with-video", withVideo);
+    $("videoColumn").hidden = !withVideo;
+    if (withVideo) $("sidebar").prepend($("game"));
     else $("stage").append($("game"));
 }
 
@@ -213,7 +240,7 @@ async function startPlayer(socket, video) {
     if (playerVideoId !== video.id) return; // Another round started while the script loaded
 
     const holder = document.createElement("div");
-    $("videoFrame").replaceChildren(holder);
+    $("playerSlot").replaceChildren(holder);
     const report = () => {
         if (!player?.getCurrentTime) return; // Not ready yet
         socket.emit("host:video", {
@@ -234,7 +261,7 @@ function stopPlayer() {
     player?.destroy?.();
     player = null;
     playerVideoId = null;
-    $("videoFrame").replaceChildren();
+    $("playerSlot").replaceChildren();
 }
 
 // Some videos aren't allowed to play outside YouTube (errors 101 and 150)
@@ -245,6 +272,119 @@ function videoFailed(socket, id, error) {
     $("hostYouTubeLink").href = `https://www.youtube.com/watch?v=${id}`;
     $("hostYouTubeLink").hidden = false;
     socket.emit("host:videoFailed");
+}
+
+async function startSharing(socket) {
+    try {
+        shareStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, height: { ideal: 720 } }, audio: true, preferCurrentTab: true });
+    } catch (e) {
+        return showHostMessage("Sharing didn't start. Press Share video and pick this tab, with tab audio on.");
+    }
+    shareStream.getVideoTracks()[0].addEventListener("ended", () => stopSharing(socket)); // Chrome's own Stop sharing button
+    await cropShare();
+    socket.emit("stream:start");
+    showSharing();
+}
+
+function stopSharing(socket) {
+    shareStream?.getTracks().forEach(track => track.stop());
+    shareStream = null;
+    viewers.forEach(peer => peer.close());
+    viewers.clear();
+    socket.emit("stream:stop");
+    showSharing();
+}
+
+// When the host shares this tab, viewers get just the video, not the host's card
+async function cropShare() {
+    const track = shareStream?.getVideoTracks()[0];
+    try {
+        await track?.cropTo(state.round.video ? await CropTarget.fromElement($("videoFrame")) : undefined);
+    } catch (e) {} // Another tab was shared, or the browser can't crop: viewers see all of it
+}
+
+// A viewer asked for the stream: the host opens a connection just for them
+async function sendStream(socket, viewerId) {
+    dropViewer(viewerId);
+    const peer = newPeer(socket, viewerId);
+    viewers.set(viewerId, peer);
+    shareStream.getTracks().forEach(track => peer.addTrack(track, shareStream));
+    peer.addEventListener("connectionstatechange", () => {
+        if (peer.connectionState === "failed") dropViewer(viewerId);
+        showSharing();
+    });
+    await peer.setLocalDescription();
+    socket.emit("rtc:signal", { to: viewerId, data: { sdp: peer.localDescription.toJSON() } });
+}
+
+function dropViewer(viewerId) {
+    viewers.get(viewerId)?.close();
+    viewers.delete(viewerId);
+    showSharing();
+}
+
+function showSharing() {
+    const watching = [...viewers.values()].filter(peer => peer.connectionState === "connected").length;
+    $("shareButton").textContent = shareStream ? "Stop sharing" : "Share video";
+    $("shareStatus").hidden = !shareStream;
+    $("shareStatus").textContent = `● Live to ${watching} ${watching === 1 ? "person" : "people"}`;
+}
+
+// Viewers join the host's stream by themselves whenever there is one, including after joining late or a refresh
+function watch(socket) {
+    const from = state.streamFrom && state.streamFrom !== socket.id && !shareStream ? state.streamFrom : null;
+    if (from === watchingFrom) return;
+    watchPeer?.close();
+    watchPeer = null;
+    watchingFrom = from;
+    showLive(socket, null);
+    if (!from) return;
+
+    const peer = watchPeer = newPeer(socket, from);
+    peer.addEventListener("track", event => showLive(socket, event.streams[0]));
+    peer.addEventListener("connectionstatechange", () => {
+        if (peer !== watchPeer || peer.connectionState !== "failed") return;
+        watchingFrom = null; // Try again in a moment
+        setTimeout(() => watch(socket), 3000);
+    });
+    socket.emit("rtc:signal", { to: from, data: { type: "hello" } });
+}
+
+function showLive(socket, stream) {
+    const video = $("liveVideo");
+    if (stream === video.srcObject && !video.hidden === !!stream) return;
+    video.srcObject = stream;
+    video.hidden = !stream;
+    if (stream) video.play().catch(() => { // Sound needs a tap first, so start muted
+        video.muted = true;
+        video.play().catch(() => {});
+        $("soundButton").hidden = false;
+    });
+    $("soundButton").hidden = !stream || !video.muted;
+    showVideo(socket);
+}
+
+function newPeer(socket, otherId) {
+    const peer = new RTCPeerConnection({ iceServers });
+    peer.addEventListener("icecandidate", event => {
+        if (event.candidate) socket.emit("rtc:signal", { to: otherId, data: { candidate: event.candidate.toJSON() } });
+    });
+    return peer;
+}
+
+// Connection messages for one link are handled one at a time, in the order they came
+function handleSignal(socket, peer, from, data) {
+    peer.queue = (peer.queue ?? Promise.resolve()).then(async () => {
+        if (data?.sdp) {
+            await peer.setRemoteDescription(data.sdp);
+            if (data.sdp.type === "offer") {
+                await peer.setLocalDescription();
+                socket.emit("rtc:signal", { to: from, data: { sdp: peer.localDescription.toJSON() } });
+            }
+        } else if (data?.candidate) {
+            await peer.addIceCandidate(data.candidate);
+        }
+    }).catch(() => {}); // A message for a link that has since closed
 }
 
 function showHostMessage(text) {

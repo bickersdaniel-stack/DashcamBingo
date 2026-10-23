@@ -887,6 +887,7 @@ button:focus-visible, .custom-colour:focus-within {
     margin: 0 auto;
 }
 .video-frame {
+    position: relative;
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -894,30 +895,53 @@ button:focus-visible, .custom-colour:focus-within {
     background-color: #000;
     box-shadow: 0 25px 50px -12px var(--board-shadow);
 }
+.player-slot, .video-frame video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.video-frame video {
+    display: block;
+    background-color: #000;
+    object-fit: contain;
+}
+.sound-button {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+}
+.share-status {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+}
 .video-frame iframe {
     display: block;
     width: 100%;
     height: 100%;
     border: 0;
 }
-.hosting .host-bar {
+.with-video .host-bar {
     max-width: none;
 }
-.hosting .sidebar .board-wrap {
+.with-video .sidebar .board-wrap {
     margin: 0;
     padding: 16px 16px 0;
     box-sizing: border-box;
 }
 /* The host's card is phone-sized next to the video, so it gets the phone spacing */
-.hosting .sidebar #bingoCardContainer {
+.with-video .sidebar #bingoCardContainer {
     padding: 6px;
     border-radius: 14px;
 }
-.hosting .sidebar .bingo-card {
+.with-video .sidebar .bingo-card {
     --gap: 4px;
     --pad: 2px;
 }
-.hosting .sidebar .bingo-cell {
+.with-video .sidebar .bingo-cell {
     border-radius: 8px;
 }
 /* Results of the round that just ended */
@@ -1038,24 +1062,24 @@ button:focus-visible, .custom-colour:focus-within {
         overflow-y: auto;
     }
     /* With the card on top, the host's sidebar is a little wider and scrolls as a whole */
-    .hosting .sidebar {
+    .with-video .sidebar {
         width: 400px;
         overflow-y: auto;
     }
     /* The video area never scrolls: the video is as big as fits under the link box */
-    .hosting .stage {
+    .with-video .stage {
         overflow-y: hidden;
     }
-    .hosting .video-frame {
+    .with-video .video-frame {
         width: min(100%, calc((100vh - 240px) * 16 / 9));
         margin: 0 auto;
     }
-    .hosting .tab-panel {
+    .with-video .tab-panel {
         flex: none;
     }
 }
 @media (min-width: 1280px) {
-    .hosting .sidebar {
+    .with-video .sidebar {
         width: 460px;
     }
 }

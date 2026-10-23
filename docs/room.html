@@ -85,13 +85,19 @@
             <form class="host-bar" id="hostBar" hidden>
                 <input class="link-input" id="videoLink" placeholder="Paste a YouTube link, or leave empty for no video" autocomplete="off" spellcheck="false" aria-label="YouTube link">
                 <button class="btn" type="submit">Start round</button>
+                <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
+                <p class="share-status" id="shareStatus" hidden></p>
                 <p class="host-note" id="hostNote" hidden>
                     <span id="hostMessage"></span>
                     <a id="hostYouTubeLink" target="_blank" rel="noopener" hidden>Open on YouTube</a>
                 </p>
             </form>
             <div class="video-column" id="videoColumn" hidden>
-                <div class="video-frame" id="videoFrame"></div>
+                <div class="video-frame" id="videoFrame">
+                    <div class="player-slot" id="playerSlot"></div>
+                    <video id="liveVideo" autoplay playsinline muted hidden></video>
+                    <button class="pill sound-button" id="soundButton" type="button" hidden>🔊 Turn on sound</button>
+                </div>
             </div>
 
             <div class="board-wrap" id="game" hidden>

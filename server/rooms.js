@@ -27,7 +27,7 @@ export function setupRooms(io) {
             while (rooms.has(code));
             const room = {
                 code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
-                nextEventId: 1, emptySince: Date.now(), hostAwaySince: null
+                nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null
             };
             startRound(room);
             rooms.set(code, room);
@@ -113,9 +113,31 @@ export function setupRooms(io) {
             io.to(room.code).emit("video:update", null);
         });
 
+        // The host shares their video straight to each viewer's browser (WebRTC); this server only passes
+        // the connection messages between them, and only between the streaming host and the others in the room
+        socket.on("stream:start", () => {
+            const room = rooms.get(socket.data.code);
+            if (!room || room.hostId !== user.id) return;
+            room.streamSocket = socket.id;
+            socket.to(room.code).emit("stream:live", socket.id);
+        });
+        socket.on("stream:stop", () => {
+            const room = rooms.get(socket.data.code);
+            if (room?.streamSocket === socket.id) endStream(io, room);
+        });
+        socket.on("rtc:signal", data => {
+            const room = rooms.get(socket.data.code);
+            const target = io.sockets.sockets.get(data?.to);
+            if (!room?.streamSocket || target?.data.code !== room.code || JSON.stringify(data.data ?? null).length > 20000) return;
+            if (socket.id !== room.streamSocket && data.to !== room.streamSocket) return; // Viewers only talk to the host
+            target.emit("rtc:signal", { from: socket.id, data: data.data });
+        });
+
         socket.on("disconnect", () => {
             const room = rooms.get(socket.data.code);
             if (!room) return;
+            if (room.streamSocket === socket.id) endStream(io, room);
+            else if (room.streamSocket) io.to(room.streamSocket).emit("rtc:left", socket.id); // A viewer left
             const left = room.connections.get(user.id) - 1;
             room.connections.set(user.id, left);
             if (left === 0) io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
@@ -194,6 +216,7 @@ function stateFor(room, userId) {
         code: room.code, hostId: room.hostId,
         round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
+        streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
         card: { phrases: card.phrases, marked: [...card.marked], bestLines: card.bestLines }
@@ -244,4 +267,9 @@ function roundSummary(room) {
             .sort((a, b) => (a.order - b.order) || (b.oneAway - a.oneAway) || (b.marked - a.marked))
             .map(({ order, ...row }) => row)
     };
+}
+
+function endStream(io, room) {
+    room.streamSocket = null;
+    io.to(room.code).emit("stream:live", null);
 }

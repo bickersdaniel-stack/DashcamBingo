@@ -2,6 +2,7 @@
 // and the cards spotted most often
 import { cardRow, playerRow } from "./board.js";
 import { fillPlayCard } from "./playcard.js";
+import { profileLink } from "./profile.js";
 
 const $ = id => document.getElementById(id);
 const tabFor = id => document.querySelector(`.tab[aria-controls="${id}"]`);
@@ -51,7 +52,7 @@ function podiumSpot(player, isMe) {
     const spot = el("li", `podium-spot${isMe ? " me" : ""}`);
     spot.append(el("span", `podium-rank board-rank ${["gold", "silver", "bronze"][player.rank - 1] ?? ""}`, `#${player.rank}`),
         Object.assign(el("img", "avatar podium-avatar"), { src: player.avatar, alt: "" }),
-        el("strong", "podium-name", player.name), el("span", "podium-tag", isMe ? "You" : player.rank === 1 ? "Top of the board" : ""),
+        profileLink(player, "podium-name"), el("span", "podium-tag", isMe ? "You" : player.rank === 1 ? "Top of the board" : ""),
         el("span", "podium-score", player.wins === 1 ? "🏆 1 bingo" : `🏆 ${player.wins} bingos`));
     return spot;
 }

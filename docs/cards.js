@@ -29,6 +29,7 @@ if (!collection.ok) {
     }
     $("cardPack").append(...[...new Set(cards.map(card => card.packName))].sort().map(name => new Option(name, name)));
     for (const id of ["cardSearch", "cardPack", "cardOwned", "cardRarity", "cardSort"]) $(id).addEventListener("input", showCards);
+    $("showcaseButton").addEventListener("click", showcase);
     showCards();
     // Seen now: the "(+3)" goes, and the new ones stay on top until you leave the page
     showNewSkins(0);
@@ -77,6 +78,17 @@ function showDetail(preview = null) {
     $("skinChoices").replaceChildren(skinChoice("No skin", null, card.owned.length > 0),
         ...styles.map(style => skinChoice(style.name, style.id, ownedIds.has(style.id), style)));
     $("skinHint").textContent = preview && !ownedIds.has(preview.id) ? `Previewing ${preview.name} (${preview.rarity}). You haven't rolled it for this card yet.` : "";
+    $("showcaseButton").setAttribute("aria-pressed", card.showcased);
+    $("showcaseButton").textContent = card.showcased ? "✓ Showcased on your profile" : "Showcase on your profile";
+}
+
+// Everyone who opens your profile sees this card, in the skin it's wearing; pressing it again takes it off
+async function showcase() {
+    const result = await api("POST", "/api/me/showcase", { cardId: open.showcased ? null : open.id });
+    if (!result.ok) return $("skinHint").textContent = result.data.error;
+    const on = !open.showcased;
+    cards.forEach(card => card.showcased = on && card === open);
+    showDetail();
 }
 
 // Owned skins put on when picked; the rest only preview on the card

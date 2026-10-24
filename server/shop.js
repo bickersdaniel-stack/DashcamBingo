@@ -3,7 +3,7 @@
 import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { recordProgress } from "./achievements.js";
-import { save, store } from "./store.js";
+import { save, store, touchProfile } from "./store.js";
 import { json, signedIn } from "./suggestions.js";
 
 export const rollCost = 100;
@@ -103,7 +103,7 @@ shop.get("/api/me/collection", signedIn, (req, res) => {
     res.json(store.cards.map(card => ({
         id: card.id, text: card.text, description: card.description, pack: card.pack, packName: packNames.get(card.pack) ?? "",
         owned: (skins[card.id]?.owned ?? []).map(skinInfo).filter(Boolean), equipped: skins[card.id]?.equipped ?? null,
-        new: unseen.has(card.id)
+        new: unseen.has(card.id), showcased: profile.showcase === card.id
     })));
 });
 
@@ -124,6 +124,15 @@ shop.post("/api/me/skins/equip", signedIn, json, (req, res) => {
     if (!entry) return res.status(400).json({ error: "You don't have skins for that card yet." });
     if (style !== null && !entry.owned.includes(style)) return res.status(400).json({ error: "You don't own that skin." });
     entry.equipped = style;
+    save();
+    res.json({ ok: true });
+});
+
+// Show one card on your profile, in whatever skin it's wearing, or none (cardId: null)
+shop.post("/api/me/showcase", signedIn, json, (req, res) => {
+    const cardId = req.body?.cardId ?? null;
+    if (cardId !== null && !store.cards.some(card => card.id === cardId)) return res.status(400).json({ error: "That card doesn't exist." });
+    touchProfile(req.session.user).showcase = cardId; // Your name and picture too, in case you've never joined a room
     save();
     res.json({ ok: true });
 });

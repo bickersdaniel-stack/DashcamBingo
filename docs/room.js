@@ -3,6 +3,7 @@ import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { cardRow, playerRow } from "./board.js";
 import { fillPlayCard, wearSkin } from "./playcard.js";
+import { openProfile, profileLink } from "./profile.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -771,7 +772,7 @@ function showPlayers() {
     const players = [...state.players].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
     $("playerList").replaceChildren(...players.map(player => {
         const row = el("li", player.connected ? "person" : "person away");
-        row.append(avatar(player), el("span", "person-name", player.name));
+        row.append(avatar(player), profileLink(player, "person-name"));
         if (player.id === state.hostId) row.append(Object.assign(el("span", "host-crown", "👑"), { title: "Host" }));
         if (player.oneAway) row.append(el("span", "badge", "1 away!"));
         row.append(
@@ -823,7 +824,7 @@ function showScoreboard(summary) {
             ? `🎉 BINGO${player.bingoAt !== null ? ` at ${formatTime(player.bingoAt)}` : ""}${player.lines > 1 ? ` · ${player.lines} lines` : ""}`
             : player.oneAway ? "1 away" : `${player.marked}/24 marked`;
         const row = el("li", player.lines > 0 ? "score winner" : "score");
-        row.append(el("span", "score-rank", String(i + 1)), avatar(player), el("span", "person-name", player.name),
+        row.append(el("span", "score-rank", String(i + 1)), avatar(player), profileLink(player, "person-name"),
             el("span", "score-result", result), Object.assign(el("span", "wins", `🏆 ${player.wins}`), { title: "Wins so far" }));
         return row;
     }));
@@ -970,6 +971,10 @@ function setUpSuggestions() {
     $("achievementsButton").addEventListener("click", () => {
         setMenuOpen(false);
         showAchievements();
+    });
+    $("profileButton").addEventListener("click", () => {
+        setMenuOpen(false);
+        openProfile(me.id);
     });
     $("suggestButton").addEventListener("click", async () => {
         setMenuOpen(false);

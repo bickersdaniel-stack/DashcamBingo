@@ -3232,6 +3232,41 @@ button.collection-item:focus-visible {
 .toast-coins {
     color: var(--amber);
 }
+/* A name that opens that player's profile. :where keeps it from beating each list's own name styles */
+:where(.profile-link) {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.profile-link:hover {
+    text-decoration: underline;
+}
+/* Profile pop-up: picture and numbers, the card they show off, then what they've earned */
+.profile-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.profile-head .avatar {
+    flex: none;
+    width: 56px;
+    height: 56px;
+}
+.profile-head h2 {
+    overflow-wrap: anywhere;
+}
+.profile-head .admin-hint {
+    margin: 0;
+}
+.profile-dialog .menu-label {
+    margin: 18px 0 8px;
+}
+.profile-showcase {
+    margin: 0 auto;
+}
 .achievement-toast {
     position: fixed;
     top: 76px;

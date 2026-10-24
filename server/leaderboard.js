@@ -1,5 +1,7 @@
 // Who has won the most, and which cards turn up the most. For signed-in players only, since it shows names
 import { Router } from "express";
+import { achievements } from "./achievements.js";
+import { skinInfo } from "./shop.js";
 import { store } from "./store.js";
 import { signedIn } from "./suggestions.js";
 
@@ -32,6 +34,33 @@ export function rankCards(cards, packs) {
         .sort((a, b) => b.counted - a.counted || a.text.localeCompare(b.text));
     return [...ranked, ...unranked];
 }
+
+// One player as everyone else sees them: wins and place, skins collected, the achievements they've earned (not the
+// ones still to get, so hidden ones stay hidden) and the card they show off. null for nobody or someone blocked
+export function profileOf(id, profiles, cards, packs) {
+    const profile = Object.hasOwn(profiles, id) ? profiles[id] : null;
+    if (!profile || profile.blocked) return null;
+    const card = cards.find(card => card.id === profile.showcase); // Gone if an admin deleted it
+    return {
+        id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", wins: profile.wins ?? 0,
+        rank: rankPlayers(profiles).find(row => row.id === id)?.rank ?? null,
+        skins: Object.values(profile.skins ?? {}).reduce((sum, entry) => sum + entry.owned.length, 0),
+        achievements: achievements.filter(a => profile.achievements?.[a.id])
+            .map(a => ({ name: a.name, description: a.description, earnedAt: profile.achievements[a.id] }))
+            .sort((a, b) => b.earnedAt - a.earnedAt),
+        achievementTotal: achievements.length,
+        showcase: card ? {
+            text: card.text, description: card.description ?? "", pack: card.pack,
+            packName: packs.find(pack => pack.id === card.pack)?.name ?? "", skin: skinInfo(profile.skins?.[card.id]?.equipped)
+        } : null
+    };
+}
+
+leaderboard.get("/api/players/:id", signedIn, (req, res) => {
+    const profile = profileOf(req.params.id, store.profiles, store.cards, store.packs);
+    if (!profile) return res.status(404).json({ error: "There's no profile to show yet." });
+    res.json(profile);
+});
 
 leaderboard.get("/api/leaderboard", signedIn, (req, res) => {
     const players = rankPlayers(store.profiles);

@@ -175,6 +175,17 @@ button:focus-visible, .custom-colour:focus-within, .path-link:focus-visible {
     text-decoration: none;
     white-space: nowrap;
 }
+/* The logo: symbol + name, spaced like the lockup in brand/ (gap = one winning square) */
+.wordmark, .bar-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.34em;
+}
+.logo-mark {
+    width: 1.8em;
+    height: 1.8em;
+    flex: none;
+}
 .bar-nav {
     display: flex;
     align-items: center;
@@ -3485,6 +3496,14 @@ button.collection-item:focus-visible {
 @media (max-width: 419px) {
     .colour-code {
         display: none;
+    }
+    /* Just the logo symbol in the solo bar; the name stays for screen readers */
+    .bar-title-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
     }
 }
 /* Phones: just your picture and the room code in the bar */

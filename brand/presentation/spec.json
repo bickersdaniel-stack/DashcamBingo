@@ -1,0 +1,41 @@
+{
+  "brand": "Dashcam Bingo",
+  "tagline": "Spot it. Mark it. Call it.",
+  "brief": "A bingo game a group of Aussie mates plays while one of them screen-shares dashcam videos on Discord. The logo has to work as a browser-tab icon, beside the name in the site's dark top bar, and as a Discord avatar, in one colour too, because every player picks their own square colour.",
+  "adjectives": ["cheeky", "social", "quick", "bold"],
+  "criteria": "Success: says dashcam and bingo without a lens, a ball or a red record dot; recognisable at 16 px; works on the site's charcoal and in one colour.",
+  "mockups": ["favicon-tab", "website", "app-icon", "social", "sticker", "tshirt"],
+  "nav": ["Play solo", "Play together", "Winning cards"],
+  "brand_color": "#22C55E",
+  "tile_color": "#111418",
+  "greyscale": false,
+  "final": true,
+  "designer": "Dashcam Bingo",
+  "concepts": [
+    {
+      "name": "Viewfinder",
+      "symbol": "../logo/dashcam-bingo-symbol.svg",
+      "lockup": "../logo/dashcam-bingo-horizontal.svg",
+      "stacked": "../logo/dashcam-bingo-stacked.svg",
+      "avatar": "../logo/dashcam-bingo-avatar.svg",
+      "symbol_on_tile": "../logo/dashcam-bingo-symbol-on-dark.svg",
+      "symbol_on_dark": "../logo/dashcam-bingo-symbol-on-dark.svg",
+      "lockup_on_dark": "../logo/dashcam-bingo-horizontal-on-dark.svg",
+      "stacked_on_dark": "../logo/dashcam-bingo-stacked-on-dark.svg",
+      "stacked_on_tile": "../logo/dashcam-bingo-stacked-on-dark.svg",
+      "idea": "The dashcam's frame locks onto your winning line.",
+      "rationale": [
+        "Two frame corners say camera; a 3 × 3 card with a marked diagonal says bingo, with no lens, ball or record dot",
+        "Bingo Green is the site's own default square colour, so the logo and the game share one signal colour",
+        "A simplified cut (heavier corners, no dots) keeps it crisp from 32 px down to a 16 px browser tab",
+        "The name is set in Plus Jakarta Sans ExtraBold, the site's own font, outlined so it looks the same everywhere"
+      ]
+    }
+  ],
+  "recommendation": "Use the horizontal lockup in the site's top bar, the symbol tile for the browser tab and Discord, and the stacked version for anything square like stickers and shirts.",
+  "next_steps": [
+    "Add the favicon and web icons to the site (files in kit/web)",
+    "Swap the plain-text title in the top bar for the logo",
+    "Use the Discord icon for your server or bot"
+  ]
+}

@@ -59,7 +59,7 @@ export function profileOf(id, profiles, cards, packs) {
 leaderboard.get("/api/players/:id", signedIn, (req, res) => {
     const profile = profileOf(req.params.id, store.profiles, store.cards, store.packs);
     if (!profile) return res.status(404).json({ error: "There's no profile to show yet." });
-    res.json(profile);
+    res.json({ ...profile, mine: req.params.id === req.session.user.id }); // Yours gets a way to change your look
 });
 
 leaderboard.get("/api/leaderboard", signedIn, (req, res) => {

@@ -87,7 +87,11 @@ function extraItem(extra) {
     const item = el("div", `extra${wearing ? " wearing" : ""}`);
     if (extra.kind === "frame") item.append(Object.assign(el("img", `avatar extra-avatar frame-${extra.id}`), { src: shop.avatar, alt: "" }));
     if (extra.kind === "banner") item.append(el("span", `extra-banner banner-${extra.id}`));
-    if (extra.kind === "reactions" || extra.kind === "celebration") item.append(el("span", "extra-emoji", extra.emojis?.join(" ") ?? extra.icon));
+    if (extra.kind === "reactions" || extra.kind === "celebration") {
+        const emojis = el("span", "extra-emoji");
+        emojis.append(...(extra.emojis ?? [extra.icon]).map(emoji => el("span", "", emoji))); // Two to a row in a narrow tile
+        item.append(emojis);
+    }
     if (extra.kind === "stamp") item.append(el("span", `bingo-cell crossed extra-stamp stamp-${extra.id}`));
     item.append(el("strong", extra.kind === "title" ? "extra-name player-title" : "extra-name", extra.name));
     const button = el("button", `btn ${owned ? "btn-quiet" : "btn-primary"} extra-button`,

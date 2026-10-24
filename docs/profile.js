@@ -1,8 +1,9 @@
-// A player's profile pop-up, opened from their name anywhere it shows: wins and place, the card they show off,
-// and the achievements they've earned
+// A player's profile pop-up, opened from their name anywhere it shows: their banner and picture, wins, place and
+// skins, then the card they show off and the achievements they've earned
 import { fillPlayCard } from "./playcard.js";
 
 let dialog = null;
+const icon = path => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -37,28 +38,28 @@ export async function openProfile(id) {
     part("error").hidden = response.ok;
     part("body").hidden = !response.ok;
     if (response.ok) {
+        part("banner").className = `profile-banner${data.banner ? ` banner-${data.banner}` : ""}`; // Our logo when they wear none
         part("avatar").replaceWith(avatarOf(data, "avatar profile-avatar"));
+        part("wins").textContent = data.wins;
+        part("rank").textContent = data.rank ? `#${data.rank}` : "–";
+        part("skins").textContent = data.skins;
+        part("action").hidden = !data.mine;
         part("name").textContent = data.name; // textContent: names are untrusted
-        part("title").textContent = data.title ?? "";
         part("title").hidden = !data.title;
-        part("banner").className = `profile-banner${data.banner ? ` banner-${data.banner}` : ""}`;
-        part("banner").hidden = !data.banner;
-        part("stats").textContent = [data.wins === 1 ? "🏆 1 bingo" : `🏆 ${data.wins} bingos`,
-            ...(data.rank ? [`#${data.rank} on the leaderboard`] : []), `${data.skins} skin${data.skins === 1 ? "" : "s"}`].join(" · ");
+        part("title-text").textContent = data.title ?? "";
+        part("earned").textContent = `${data.achievements.length} of ${data.achievementTotal} achievements`;
         if (data.showcase) {
             const { text, description, pack, packName, skin } = data.showcase;
             fillPlayCard(part("showcase"), { name: text, note: description, packId: pack, packName, skin });
+            part("card-name").textContent = text;
+            part("card-pack").textContent = `${packName} pack`;
+            part("card-skin").replaceChildren(skin ? el("span", `rarity-tag rarity-${skin.rarity}`, skin.rarity) : "", skin ? ` ${skin.name}` : "No skin on");
         }
-        part("showcase").hidden = !data.showcase;
+        part("showcase-row").hidden = !data.showcase;
         part("no-showcase").hidden = !!data.showcase;
-        part("earned").textContent = `Achievements · ${data.achievements.length} of ${data.achievementTotal}`;
-        part("achievements").replaceChildren(...(data.achievements.length ? data.achievements.map(a => {
-            const item = el("li", "item achievement earned");
-            const words = el("span", "item-text");
-            words.append(el("strong", "", a.name), el("span", "", a.description));
-            item.append(el("span", "achievement-medal", "🏆"), words);
-            return item;
-        }) : [el("li", "item empty", "None yet.")]));
+        part("achievements").replaceChildren(...(data.achievements.length
+            ? data.achievements.map(a => Object.assign(el("li", "", a.name), { title: a.description }))
+            : [el("li", "profile-none", "None yet.")]));
     }
     if (!dialog.open) dialog.showModal();
 }
@@ -69,20 +70,37 @@ function makeDialog() {
     node.innerHTML = `
         <p class="email-message error profile-error" role="status" hidden></p>
         <div class="profile-body">
-            <div class="profile-banner" hidden></div>
-            <div class="profile-head">
+            <div class="profile-banner"><svg class="logo-mark" aria-hidden="true"><use href="/icons/logo-mark.svg#mark-small"/></svg></div>
+            <div class="profile-top">
                 <img class="avatar profile-avatar" alt="">
-                <div>
-                    <h2 class="profile-name"></h2>
-                    <p class="player-title profile-title" hidden></p>
-                    <p class="admin-hint profile-stats"></p>
-                </div>
+                <p class="profile-stats">
+                    <span><strong class="profile-wins"></strong>Bingos</span>
+                    <span><strong class="profile-rank"></strong>Place</span>
+                    <span><strong class="profile-skins"></strong>Skins</span>
+                </p>
+                <a class="btn btn-primary profile-action" href="/shop" hidden>Change look</a>
             </div>
-            <p class="menu-label">Showcase</p>
-            <div class="play-card profile-showcase"></div>
-            <p class="admin-hint profile-no-showcase">Nothing showcased yet.</p>
-            <p class="menu-label profile-earned"></p>
-            <ul class="item-list achievement-list profile-achievements"></ul>
+            <h2 class="profile-name"></h2>
+            <p class="profile-meta">
+                <span class="profile-title">${icon("M7 7h.01M7 3h5a2 2 0 011.41.59l7 7a2 2 0 010 2.82l-7 7a2 2 0 01-2.82 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z")}<span class="profile-title-text"></span></span>
+                <span>${icon("M12 15a6 6 0 100-12 6 6 0 000 12zm0 0l-4 6 1.5-4.5L5 15m7 0l4 6-1.5-4.5L19 15")}<span class="profile-earned"></span></span>
+            </p>
+            <section class="profile-section">
+                <h3 class="profile-heading">Showcase</h3>
+                <div class="profile-showcase-row">
+                    <div class="play-card mini profile-showcase"></div>
+                    <div class="profile-facts">
+                        <strong class="profile-card-name"></strong>
+                        <span class="profile-card-pack"></span>
+                        <span class="profile-card-skin"></span>
+                    </div>
+                </div>
+                <p class="profile-none profile-no-showcase">Nothing showcased yet.</p>
+            </section>
+            <section class="profile-section">
+                <h3 class="profile-heading">Achievements</h3>
+                <ul class="profile-achievements"></ul>
+            </section>
         </div>
         <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>`;
     document.body.append(node);

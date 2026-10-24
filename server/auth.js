@@ -54,7 +54,8 @@ auth.get("/auth/discord/callback", async (req, res) => {
         if (!asked) return res.redirect(`/auth/discord?ask=1${next === "/" ? "" : `&next=${next}`}`);
         return res.redirect(next); // Pressed Cancel on Discord
     }
-    if (!expected || req.query.state !== expected) return res.status(400).send("Sign-in expired. Go back and try again.");
+    // Finished in a browser that didn't start it: back to the room link, to sign in again from there
+    if (!expected || req.query.state !== expected) return next === "/" ? res.status(400).send("Sign-in expired. Go back and try again.") : res.redirect(next);
     try {
         const token = await postForm("https://discord.com/api/oauth2/token", {
             grant_type: "authorization_code", code: req.query.code, redirect_uri: discordRedirect,
@@ -87,7 +88,8 @@ auth.get("/auth/google", (req, res) => {
 auth.get("/auth/google/callback", async (req, res) => {
     const { expected, next } = takeSignIn(req);
     if (!req.query.code) return res.redirect(next); // Pressed Cancel on Google
-    if (!expected || req.query.state !== expected) return res.status(400).send("Sign-in expired. Go back and try again.");
+    // Finished in a browser that didn't start it: back to the room link, to sign in again from there
+    if (!expected || req.query.state !== expected) return next === "/" ? res.status(400).send("Sign-in expired. Go back and try again.") : res.redirect(next);
     try {
         const token = await postForm("https://oauth2.googleapis.com/token", {
             grant_type: "authorization_code", code: req.query.code, redirect_uri: googleRedirect,
@@ -153,14 +155,18 @@ auth.post("/auth/email/finish", express.urlencoded({ extended: false, limit: "2k
     res.redirect(data.next);
 });
 
-// Remembers where to go back to (only ever a room link on this site) and proves the reply belongs to this sign-in
+// Remembers where to go back to (only ever a room link on this site) and proves the reply belongs to this sign-in.
+// The room code also rides on the end of the state, which Discord and Google hand back: on phones the sign-in often
+// finishes in another browser (tapped in a chat app, finished in Chrome) that never saw this session
 function startSignIn(req, next) {
-    req.session.state = randomBytes(16).toString("hex");
-    req.session.next = /^\/r\/[A-Z0-9]{5}$/.test(next) ? next : undefined;
+    const room = /^\/r\/([A-Z0-9]{5})$/.exec(next)?.[1];
+    req.session.state = randomBytes(16).toString("hex") + (room ? `-${room}` : "");
+    req.session.next = room ? next : undefined;
 }
 
 function takeSignIn(req) {
-    const signIn = { expected: req.session.state, next: req.session.next ?? "/" };
+    const room = /-([A-Z0-9]{5})$/.exec(String(req.query.state ?? ""))?.[1];
+    const signIn = { expected: req.session.state, next: req.session.next ?? (room ? `/r/${room}` : "/") };
     delete req.session.state;
     delete req.session.next;
     return signIn;

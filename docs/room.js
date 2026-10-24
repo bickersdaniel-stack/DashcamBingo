@@ -13,6 +13,13 @@ const code = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})$/)?.[1].toUpperCase
 const meResponse = await fetch("/api/me");
 const me = meResponse.ok ? await meResponse.json() : null;
 const signInOptions = me ? {} : await meResponse.json().catch(() => ({})); // Which ways to sign in are set up
+// Signing up from an invite link often detours (a new Discord account lands in the Discord app), and people come back
+// through the front page. The room they were invited to is remembered on this device for an hour, so go there instead
+const [invitedRoom, invitedAt] = (load("invitedTo") ?? "").split(" ");
+if (me && !code && Date.now() - Number(invitedAt) < 60 * 60_000) {
+    location.replace(`/r/${invitedRoom}`);
+    await new Promise(() => {}); // Stop here, so the lobby and its welcome don't flash up first
+}
 const listNames = new Intl.ListFormat("en-AU", { type: "conjunction" });
 let state = null;         // What the server last said about the room
 let marked = new Set();   // My marked squares
@@ -55,8 +62,10 @@ if (me) {
 }
 
 if (!me) {
+    if (code) save("invitedTo", `${code} ${Date.now()}`);
     showSignIn();
 } else if (code) {
+    save("invitedTo", "");
     joinRoom();
 } else {
     showLobby();

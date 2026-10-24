@@ -782,6 +782,9 @@ a.btn {
     font-weight: 500;
     color: var(--accent);
 }
+.win-tag.plain { /* A round's card without a bingo */
+    color: var(--text-muted);
+}
 .win-card img {
     display: block;
     width: 100%;
@@ -1350,6 +1353,13 @@ body.in-lobby .code-slots span {
     letter-spacing: 0.15em;
     color: var(--heading);
 }
+.widget-head .logo-mark {
+    width: 1.4em;
+    height: 1.4em;
+}
+.widget-head .round-number:has(+ .now-playing:not([hidden])) {
+    flex: none; /* Now playing takes the room instead */
+}
 .widget-head .round-number {
     flex: 1;
     font-size: 12px;
@@ -1451,6 +1461,26 @@ body.in-lobby .code-slots span {
     border-color: var(--stamp);
     background-color: var(--stamp-ambient);
 }
+/* Each round's items under its number */
+.feed-round {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.feed-round:first-child {
+    margin-top: 0;
+}
+.feed-round::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+}
 /* Emojis on a feed item: a + beside its time, and the ones people put on it underneath */
 .feed-item {
     flex-wrap: wrap;
@@ -1472,8 +1502,11 @@ body.in-lobby .code-slots span {
     font-size: 12px;
     cursor: pointer;
 }
-.reaction:hover {
+.reaction:hover:not(:disabled) {
     border-color: var(--border-strong);
+}
+.reaction:disabled {
+    cursor: default;
 }
 .reaction[aria-pressed="true"] {
     border-color: var(--stamp);
@@ -1501,10 +1534,15 @@ body.in-lobby .code-slots span {
     text-align: center;
     color: var(--text-faint);
 }
+/* What the host is playing, in the video tile's title bar; a long title runs out to "…" */
 .now-playing {
-    margin: 0 0 8px;
-    padding: 0 4px;
-    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-muted);
 }
 .now-playing em {

@@ -174,6 +174,10 @@ function joinRoom() {
     }));
     socket.on("room:state", newState => {
         const previousRound = state?.round.number;
+        // A new round while you're here: the card you had goes in Bingo cards before it's redrawn (unless it's empty)
+        if (previousRound && newState.round.number > previousRound && marked.size) {
+            captureScreenshot({ title: `Round ${previousRound}`, note: "Round ended", bingo: countLines(marked) > 0 });
+        }
         state = newState;
         videoSeenAt = Date.now();
         showRoom(socket);
@@ -382,7 +386,7 @@ function checkBingo() {
     $("bingoAlert").hidden = lines === 0;
     if (lines > bestLines) {
         bestLines = lines;
-        captureScreenshot();
+        captureScreenshot({ title: `Bingo · Round ${state.round.number}` });
     }
 }
 
@@ -399,6 +403,8 @@ function showVideo(socket) {
     $("roomVideoSection").hidden = !isHost || withVideo;
     if (isHost) fillLockedLink();
     arrange(withVideo, isHost);
+    // Now playing sits in the video tile's title bar, or the card's while there's no video tile (no stream to watch)
+    (withVideo ? $("videoLabel") : $("roundNumber")).after($("nowPlaying"));
     if (hosting) startPlayer(socket, state.round.video);
     else stopPlayer();
     if (shareStream) cropShare();
@@ -703,9 +709,12 @@ function replay(event) {
 }
 
 // Players see where the host's video is up to, counting on between the host's reports
+// For everyone but the host (who has their controls there), in place of "Video" in the video tile's title bar
 function showNowPlaying() {
     const video = state.round.video;
-    $("nowPlaying").hidden = !video || state.hostId === me.id;
+    const isHost = state.hostId === me.id;
+    $("nowPlaying").hidden = !video || isHost;
+    $("videoLabel").hidden = !$("nowPlaying").hidden || (isHost && (!!video || !$("liveVideo").hidden));
     if ($("nowPlaying").hidden) return;
     $("nowPlayingTitle").textContent = video.title || "the host's video";
     $("nowPlayingTime").textContent = formatTime(Math.floor(videoSecondsNow()));
@@ -795,46 +804,56 @@ function showPlayers() {
     }));
 }
 
+// This round's feed, then the last few rounds', each under its number once there's more than one
 function showFeed() {
-    const items = [...state.events].reverse().map(event => {
-        const still = event.type === "spot" ? event.userIds.filter(id => !(event.cleared ?? []).includes(id)) : null;
-        const ids = event.type === "spot" ? (still.length ? still : event.userIds) : [event.userId];
-        const names = listNames.format(ids.map(id => playerById(id).name));
-        const text = el("span", "feed-text");
-        if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
-        else if (event.type === "host") text.append(`👑 ${names} is now the host`);
-        else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
-        else if (event.type === "achievement") text.append(`🏆 ${names} unlocked `, el("em", "", event.name));
-        else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
-
-        const avatars = el("span", "feed-avatars");
-        avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
-        const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
-        if ((still && still.length === 0) || event.undone) item.classList.add("undone");
-        // The host can click a moment from this video to watch it again, from 5 seconds before
-        const replayable = playerVideoId !== null && event.videoId === playerVideoId;
-        const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
-        if (replayable) {
-            time.type = "button";
-            time.title = "Replay from 5 seconds before";
-            item.classList.add("replayable");
-            item.addEventListener("click", () => replay(event));
-        }
-        item.append(avatars, text, time);
-        if (["spot", "win", "achievement"].includes(event.type)) item.append(...reactionParts(event));
-        return item;
+    const rounds = [{ number: state.round.number, events: state.events, current: true }, ...(state.pastRounds ?? [])];
+    const items = rounds.flatMap(round => {
+        const rows = [...round.events].reverse().map(event => feedItem(event, round.current));
+        const show = rounds.length > 1 && (rows.length || round.current);
+        return show ? [el("li", "feed-round", round.current ? `Round ${round.number} · now` : `Round ${round.number}`), ...rows] : rows;
     });
     $("feedList").replaceChildren(...items);
     $("feedEmpty").hidden = items.length > 0;
 }
 
+// One feed item; only this round's take new emojis, since the server keeps reactions for this round alone
+function feedItem(event, current) {
+    const still = event.type === "spot" ? event.userIds.filter(id => !(event.cleared ?? []).includes(id)) : null;
+    const ids = event.type === "spot" ? (still.length ? still : event.userIds) : [event.userId];
+    const names = listNames.format(ids.map(id => playerById(id).name));
+    const text = el("span", "feed-text");
+    if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
+    else if (event.type === "host") text.append(`👑 ${names} is now the host`);
+    else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
+    else if (event.type === "achievement") text.append(`🏆 ${names} unlocked `, el("em", "", event.name));
+    else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
+
+    const avatars = el("span", "feed-avatars");
+    avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
+    const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
+    if ((still && still.length === 0) || event.undone) item.classList.add("undone");
+    // The host can click a moment from this video to watch it again, from 5 seconds before
+    const replayable = playerVideoId !== null && event.videoId === playerVideoId;
+    const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
+    if (replayable) {
+        time.type = "button";
+        time.title = "Replay from 5 seconds before";
+        item.classList.add("replayable");
+        item.addEventListener("click", () => replay(event));
+    }
+    item.append(avatars, text, time);
+    if (["spot", "win", "achievement"].includes(event.type)) item.append(...reactionParts(event, current));
+    return item;
+}
+
 // A + beside a feed item's time that opens the emojis I can use, and under its words the ones people have put on it
 // (mine pressed, to take back off)
-function reactionParts(event) {
+function reactionParts(event, current) {
     const row = el("div", "feed-reactions");
     const chip = (emoji, label, className = "reaction") => {
         const button = el("button", className, label);
         button.type = "button";
+        button.disabled = !current;
         button.addEventListener("click", click => {
             click.stopPropagation(); // Not the host's replay
             pickingFor = null;
@@ -848,6 +867,7 @@ function reactionParts(event) {
         button.title = listNames.format(ids.map(id => playerById(id).name));
         row.append(button);
     }
+    if (!current) return row.hasChildNodes() ? [row] : []; // An earlier round: what people put, no more
     const add = el("button", "reaction react-add", pickingFor === event.id ? "×" : "☺+");
     add.type = "button";
     add.ariaLabel = pickingFor === event.id ? "Close emojis" : "Add an emoji";

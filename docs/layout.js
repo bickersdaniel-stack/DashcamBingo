@@ -7,7 +7,7 @@ import { load, save } from "./core.js";
 const $ = id => document.getElementById(id);
 const rows = 12;      // The built-in layouts are this many rows tall, and rows are sized so that fits the window
 const narrowPx = 900; // Below this width the tiles stack
-const names = { video: "Video", host: "Host controls", players: "Players", feed: "Feed", wins: "Winning cards", leaderboard: "Leaderboard" };
+const names = { video: "Video", host: "Host controls", players: "Players", feed: "Feed", wins: "Bingo cards", leaderboard: "Leaderboard" };
 
 // Places on a 12-column grid. Hidden tiles keep a place for when they're shown again
 const at = (x, y, w, h) => ({ x, y, w, h });

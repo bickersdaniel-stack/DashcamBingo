@@ -268,7 +268,7 @@
             <div class="room-grid grid-stack" id="roomGrid" hidden>
                 <div class="grid-stack-item" gs-id="video">
                     <div class="grid-stack-item-content widget">
-                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span id="videoLabel">Video</span><div class="video-tools" id="videoTools"></div><button class="widget-hide" type="button" data-hide aria-label="Hide video" title="Hide video"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span id="videoLabel">Video</span><span class="now-playing" id="nowPlaying" hidden>Now playing: <em id="nowPlayingTitle"></em> · <span id="nowPlayingTime"></span></span><div class="video-tools" id="videoTools"></div><button class="widget-hide" type="button" data-hide aria-label="Hide video" title="Hide video"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
                         <div class="widget-body video-body">
                             <div class="video-frame" id="videoFrame">
                                 <div class="player-slot" id="playerSlot"></div>
@@ -287,7 +287,8 @@
                 <div class="grid-stack-item" gs-id="card">
                     <div class="grid-stack-item-content widget" id="game">
                         <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>
-                            <span>Card</span>
+                            <svg class="logo-mark" aria-hidden="true"><use href="/icons/logo-mark.svg#mark-small"/></svg>
+                            <span>Dashcam Bingo</span>
                             <span class="round-number" id="roundNumber"></span>
                             <button class="pill" id="rerollButton" type="button" hidden>
                                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -295,7 +296,6 @@
                             </button>
                         </div>
                         <div class="widget-body card-body">
-                            <p class="now-playing" id="nowPlaying" hidden>Now playing: <em id="nowPlayingTitle"></em> · <span id="nowPlayingTime"></span></p>
                             <div class="status-row">
                                 <span class="bingo-alert" id="bingoAlert" hidden>🎉 Bingo winner!</span>
                             </div>
@@ -348,20 +348,20 @@
                 </div>
                 <div class="grid-stack-item" gs-id="wins">
                     <div class="grid-stack-item-content widget">
-                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span>Winning cards</span><button class="widget-hide" type="button" data-hide aria-label="Hide winning cards" title="Hide winning cards"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+                        <div class="widget-head"><svg class="icon widget-grip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg><span>Bingo cards</span><button class="widget-hide" type="button" data-hide aria-label="Hide bingo cards" title="Hide bingo cards"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
                         <div class="widget-body">
                             <div class="win-list" id="gallery">
                                 <div class="empty-state" id="emptyState">
                                     <div class="empty-icon">
                                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
                                     </div>
-                                    <p class="empty-title">No winning rounds yet</p>
-                                    <p class="empty-hint">Complete any row, column, or diagonal line to claim a winning card.</p>
+                                    <p class="empty-title">No bingo cards yet</p>
+                                    <p class="empty-hint">Your card is saved here when you get a bingo, and again when each round ends.</p>
                                 </div>
                             </div>
                         </div>
                         <div class="sidebar-foot">
-                            <span class="count" id="winCount">0 winning cards</span>
+                            <span class="count" id="winCount">0 bingo cards</span>
                             <button id="clearHistoryButton" class="link-button" type="button">Clear History</button>
                         </div>
                     </div>

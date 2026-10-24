@@ -16,6 +16,7 @@ const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
 const maxCount = 99;
+const keptRounds = 4; // Finished rounds the feed still shows, newest first
 let roomsIo = null; // Kept so changes from the admin page reach rooms in progress
 
 export function setupRooms(io) {
@@ -307,6 +308,8 @@ export function refreshPlayer(userId) {
 function startRound(room, video = null, replace = false) {
     video = continueVideo(room.round?.video, video); // Same dashcam clip, next bingo: keep watching from here
     const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
+    // The round that's ending stays in the feed under its number (a replaced round had nothing in it)
+    if (room.round && !replace) room.pastRounds = [{ number: room.round.number, events: room.round.events }, ...(room.pastRounds ?? [])].slice(0, keptRounds);
     room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard(room));
 }
@@ -493,6 +496,7 @@ function stateFor(room, userId) {
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
+        pastRounds: room.pastRounds ?? [],
         // skins: your own equipped skin on each square (nobody else sees them)
         card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(profile.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };

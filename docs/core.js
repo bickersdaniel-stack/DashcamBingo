@@ -1,5 +1,5 @@
 // Shared by the solo game and together mode: the top bar (theme and colour menu), saved settings,
-// drawing the board, and screenshots of winning cards. Importing this sets up the top bar and sidebar.
+// drawing the board, and screenshots of bingo cards. Importing this sets up the top bar and sidebar.
 const bingoCard = document.getElementById("bingoCard");
 const gallery = document.getElementById("gallery");
 const emptyState = document.getElementById("emptyState");
@@ -203,13 +203,19 @@ export function setCount(cell, count) {
     cell.setAttribute("aria-pressed", count > 0);
 }
 
-// Draw the card ourselves. html2canvas drops spaces and doubles letters with this font.
-export function captureScreenshot() {
+// Draw the card ourselves. html2canvas drops spaces and doubles letters with this font. It's read straight away, so
+// a card about to be redrawn can still be saved. title and note label it in Bingo cards; bingo says if it was one
+export function captureScreenshot({ title = "Bingo", note = "Got it", bingo = true } = {}) {
     const cells = [...bingoCard.children];
     const phrases = cells.map((cell, i) => i === 12 ? "FREE" : cell.querySelector(".cell-text").textContent);
     const counts = cells.map(cell => Number(cell.dataset.count) || 0);
-    drawCardShot(phrases, counts).toBlob(blob => addWinningCard(blob));
+    const tag = bingo ? "✓ BINGO" : `${counts.filter(n => n > 0).length}/24 marked`;
+    drawCardShot(phrases, counts).toBlob(blob => addBingoCard(blob, { title, note, tag, bingo }));
 }
+
+// The logo from icons/logo-mark.svg (mark-small, a 240 box from 8,8): its corners in the heading colour, squares in green
+const logoCorners = new Path2D("M8 86 L8 48 A40 40 0 0 1 48 8 L86 8 A14 14 0 0 1 86 36 L48 36 A12 12 0 0 0 36 48 L36 86 A14 14 0 0 1 8 86 Z M248 170 L248 208 A40 40 0 0 1 208 248 L170 248 A14 14 0 0 1 170 220 L208 220 A12 12 0 0 0 220 208 L220 170 A14 14 0 0 1 248 170 Z");
+const logoSquares = new Path2D("M60 48 H84 A12 12 0 0 1 96 60 V84 A12 12 0 0 1 84 96 H60 A12 12 0 0 1 48 84 V60 A12 12 0 0 1 60 48 Z M116 104 H140 A12 12 0 0 1 152 116 V140 A12 12 0 0 1 140 152 H116 A12 12 0 0 1 104 140 V116 A12 12 0 0 1 116 104 Z M172 160 H196 A12 12 0 0 1 208 172 V196 A12 12 0 0 1 196 208 H172 A12 12 0 0 1 160 196 V172 A12 12 0 0 1 172 160 Z");
 
 function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -260,11 +266,25 @@ function drawCardShot(phrases, counts) {
     ctx.fillStyle = boardBg;
     ctx.fill();
 
-    ctx.fillStyle = heading;
+    // The logo and name, centred together
+    const name = "Dashcam Bingo";
+    const logo = 26;
+    const logoGap = 10;
     ctx.font = `800 22px ${font}`;
-    ctx.textAlign = "center";
+    const left = (size - logo - logoGap - ctx.measureText(name).width) / 2;
+    ctx.save();
+    ctx.translate(left, (titleH - logo) / 2);
+    ctx.scale(logo / 240, logo / 240);
+    ctx.translate(-8, -8);
+    ctx.fillStyle = heading;
+    ctx.fill(logoCorners);
+    ctx.fillStyle = "#22C55E";
+    ctx.fill(logoSquares);
+    ctx.restore();
+    ctx.fillStyle = heading;
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("Dashcam Bingo", size / 2, titleH / 2);
+    ctx.fillText(name, left + logo + logoGap, titleH / 2);
 
     phrases.forEach((phrase, i) => {
         const col = i % 5;
@@ -312,7 +332,7 @@ function drawCardShot(phrases, counts) {
     return canvas;
 }
 
-function addWinningCard(blob) {
+function addBingoCard(blob, { title, note, tag, bingo }) {
     winCount++;
     const styles = getComputedStyle(document.documentElement);
     const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -323,15 +343,19 @@ function addWinningCard(blob) {
         <div class="win-head">
             <div class="win-num" style="background-color: ${colorPicker.value}; color: ${styles.getPropertyValue("--stamp-text")}">#${winCount}</div>
             <div class="win-info">
-                <div class="win-title">Winning card</div>
-                <div class="win-time">Achieved at ${time}</div>
+                <div class="win-title"></div>
+                <div class="win-time"></div>
             </div>
-            <div class="win-tag">✓ BINGO</div>
+            <div class="win-tag"></div>
         </div>`;
+    card.querySelector(".win-title").textContent = title;
+    card.querySelector(".win-time").textContent = `${note} at ${time}`;
+    card.querySelector(".win-tag").textContent = tag;
+    card.querySelector(".win-tag").classList.toggle("plain", !bingo);
 
     const img = new Image();
     img.src = URL.createObjectURL(blob);
-    img.alt = 'Winning Bingo Card Screenshot';
+    img.alt = `${title}: bingo card screenshot`;
     img.title = 'Click to copy';
     img.onclick = () => copyToClipboard(blob); // Copy to clipboard on click
     card.appendChild(img);
@@ -342,7 +366,7 @@ function addWinningCard(blob) {
 
 function showWinCount() {
     emptyState.hidden = winCount > 0;
-    winCountLabel.textContent = `${winCount} winning card${winCount === 1 ? '' : 's'}`;
+    winCountLabel.textContent = `${winCount} bingo card${winCount === 1 ? '' : 's'}`;
 }
 
 function copyToClipboard(blob) {

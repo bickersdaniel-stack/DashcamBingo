@@ -1,4 +1,5 @@
-// The shop: spend coins on rolls for card skins (a style on one card), collect them, and wear them on your squares.
+// The shop: spend coins on rolls for card skins (a style on one card), or buy the one you want outright, collect
+// them, and wear them on your squares.
 // Coins only come from playing; nothing here costs real money
 import { randomInt } from "node:crypto";
 import { Router } from "express";
@@ -10,11 +11,12 @@ export const rollCost = 100;
 export const duplicateRefund = 25;
 export const pityAfter = 10; // After this many rolls without an epic or better, the next one is
 
+// price: buying one outright, dearer than a roll so rolling stays the cheap gamble
 export const rarities = [
-    { id: "common", name: "Common", weight: 60 },
-    { id: "rare", name: "Rare", weight: 28 },
-    { id: "epic", name: "Epic", weight: 10 },
-    { id: "legendary", name: "Legendary", weight: 2 }
+    { id: "common", name: "Common", weight: 60, price: 150 },
+    { id: "rare", name: "Rare", weight: 28, price: 300 },
+    { id: "epic", name: "Epic", weight: 10, price: 600 },
+    { id: "legendary", name: "Legendary", weight: 2, price: 1500 }
 ];
 // Each is drawn in styles.css (.skin-<id>), so there's no artwork to make
 export const styles = [
@@ -74,6 +76,25 @@ export function buy(profile, cards, random = randomInt) {
     };
 }
 
+// One skin you picked, for its rarity's price; it goes on if the card wears none. It doesn't count as rolling a
+// legendary. Returns what you have now, or { error }
+export function buySkin(profile, card, styleId) {
+    const style = styles.find(s => s.id === styleId);
+    if (!card || !style) return { error: "That skin doesn't exist." };
+    if (profile.skins?.[card.id]?.owned.includes(style.id)) return { error: "You already own that skin." };
+    const { price } = rarities.find(r => r.id === style.rarity);
+    if ((profile.coins ?? 0) < price) return { error: `That skin costs ${price} coins.` };
+    profile.coins -= price;
+    const entry = (profile.skins ??= {})[card.id] ??= { owned: [], equipped: null };
+    entry.owned.push(style.id);
+    entry.equipped ??= style.id;
+    const earned = recordProgress(profile, { skins: 1 });
+    return {
+        skin: skinInfo(style.id), equipped: entry.equipped, coins: profile.coins,
+        achievements: earned.map(a => ({ name: a.name, description: a.description, coins: a.coins }))
+    };
+}
+
 export const shop = Router();
 
 shop.get("/api/shop", signedIn, (req, res) => {
@@ -81,7 +102,7 @@ shop.get("/api/shop", signedIn, (req, res) => {
     const total = rarities.reduce((sum, r) => sum + r.weight, 0);
     res.json({
         coins: profile.coins ?? 0, cost: rollCost, refund: duplicateRefund, pity: profile.pity ?? 0, pityAfter, newSkins: profile.newSkins?.length ?? 0,
-        rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100) })), styles
+        rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100), price: r.price })), styles
     });
 });
 
@@ -91,6 +112,14 @@ shop.post("/api/shop/roll", signedIn, (req, res) => {
     if (result.error) return res.status(400).json(result);
     save();
     result.card.packName = store.packs.find(pack => pack.id === result.card.pack)?.name ?? "";
+    res.json(result);
+});
+
+shop.post("/api/shop/buy", signedIn, json, (req, res) => {
+    const profile = store.profiles[req.session.user.id] ??= { wins: 0 };
+    const result = buySkin(profile, store.cards.find(card => card.id === req.body?.cardId), req.body?.style);
+    if (result.error) return res.status(400).json(result);
+    save();
     res.json(result);
 });
 

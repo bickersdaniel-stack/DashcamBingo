@@ -1,7 +1,7 @@
 // Cards page: every square with the skins you've collected for it, to search, filter and sort, and each one up close
-// with its details and every skin: the ones you own to wear, the rest to preview
+// with its details and every skin: the ones you own to wear, the rest to preview and buy
 import { fillPlayCard } from "./playcard.js";
-import { showNewSkins } from "./nav.js";
+import { coinsText, showNewSkins } from "./nav.js";
 
 const $ = id => document.getElementById(id);
 const rarityOrder = ["common", "rare", "epic", "legendary"];
@@ -15,6 +15,9 @@ const sorts = {
 let cards = [];   // Your collection, with each card's spotted rate added
 let styles = [];  // Every skin there is
 let open = null;  // The card in the dialog
+let buying = null; // The skin being previewed, which you don't own
+let prices = {};  // What a skin of each rarity costs to buy
+let coins = 0;
 
 const [collection, all, shop] = await Promise.all(["/api/me/collection", "/api/cards", "/api/shop"].map(url => api("GET", url)));
 if (!collection.ok) {
@@ -26,10 +29,13 @@ if (!collection.ok) {
     cards = collection.data.map(card => ({ ...card, rate: rates.get(card.id) ?? null }));
     if (shop.ok) {
         styles = [...shop.data.styles].sort((a, b) => rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity));
+        prices = Object.fromEntries(shop.data.rarities.map(r => [r.id, r.price]));
+        coins = shop.data.coins;
     }
     $("cardPack").append(...[...new Set(cards.map(card => card.packName))].sort().map(name => new Option(name, name)));
     for (const id of ["cardSearch", "cardPack", "cardOwned", "cardRarity", "cardSort"]) $(id).addEventListener("input", showCards);
     $("showcaseButton").addEventListener("click", showcase);
+    $("buyButton").addEventListener("click", buy);
     showCards();
     // Seen now: the "(+3)" goes, and the new ones stay on top until you leave the page
     showNewSkins(0);
@@ -77,9 +83,29 @@ function showDetail(preview = null) {
     $("skinCount").textContent = `Skins ${card.owned.length}/${styles.length}`;
     $("skinChoices").replaceChildren(skinChoice("No skin", null, card.owned.length > 0),
         ...styles.map(style => skinChoice(style.name, style.id, ownedIds.has(style.id), style)));
-    $("skinHint").textContent = preview && !ownedIds.has(preview.id) ? `Previewing ${preview.name} (${preview.rarity}). You haven't rolled it for this card yet.` : "";
+    buying = preview && !ownedIds.has(preview.id) ? preview : null;
+    $("skinHint").textContent = buying ? `Previewing ${buying.name} (${buying.rarity}). You don't have it for this card yet.` : "";
+    $("buyButton").hidden = !buying;
+    if (buying) {
+        $("buyButton").textContent = `Buy for ${prices[buying.rarity]} 🪙`;
+        $("buyButton").disabled = coins < prices[buying.rarity];
+        if (coins < prices[buying.rarity]) $("skinHint").append(` You have ${coins.toLocaleString()} coins.`);
+    }
     $("showcaseButton").setAttribute("aria-pressed", card.showcased);
     $("showcaseButton").textContent = card.showcased ? "✓ Showcased on your profile" : "Showcase on your profile";
+}
+
+async function buy() {
+    const result = await api("POST", "/api/shop/buy", { cardId: open.id, style: buying.id });
+    if (!result.ok) return $("skinHint").textContent = result.data.error;
+    const { skin, equipped, achievements } = result.data;
+    coins = result.data.coins;
+    document.querySelectorAll(".my-coins").forEach(node => node.textContent = coinsText(coins)); // The bar and the menu
+    open.owned.push(skin);
+    open.equipped = equipped;
+    showDetail(equipped === skin.id ? null : skin); // Still showing the skin you bought
+    $("skinHint").textContent = [`${skin.name} is yours.`, ...achievements.map(a => `🏆 ${a.name} unlocked${a.coins ? ` · +${a.coins} 🪙` : ""}`)].join(" ");
+    showCards();
 }
 
 // Everyone who opens your profile sees this card, in the skin it's wearing; pressing it again takes it off

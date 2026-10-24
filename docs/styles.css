@@ -2697,6 +2697,9 @@ button.collection-item:focus-visible {
 .card-dialog-side .admin-hint {
     margin: 0;
 }
+.card-buy {
+    margin-top: 10px;
+}
 .card-dialog-side .menu-label {
     margin: 16px 0 8px;
 }

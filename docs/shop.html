@@ -18,15 +18,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="has-nav">
     <header class="top-bar">
         <div class="bar-side">
-            <a class="pill together-link" href="/" aria-label="Back to rooms">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                <span class="together-label">Back to rooms</span>
-            </a>
+            <a class="wordmark" href="/">Dashcam Bingo</a>
+            <nav class="bar-nav" aria-label="Pages">
+                <a class="pill" href="/">Lobby</a>
+                <a class="pill" href="/leaderboard">Leaderboard</a>
+                <a class="pill" href="/leaderboard#cards">Cards</a>
+                <a class="pill" href="/shop" aria-current="page">Shop</a>
+            </nav>
         </div>
-        <h1 class="bar-title">Dashcam Bingo</h1>
         <div class="bar-side">
             <span class="pill shop-coins" id="coins"></span>
         </div>
@@ -36,23 +38,35 @@
         <h2>Shop</h2>
         <p class="email-message error" id="shopMessage" role="status" hidden></p>
 
-        <section class="shop-roll" id="rollSection">
-            <!-- The card flips over to show what you rolled -->
-            <div class="reveal" id="reveal">
-                <div class="reveal-inner" id="revealInner">
-                    <div class="reveal-face reveal-back play-card"><span class="reveal-logo">Dashcam<br>Bingo</span></div>
-                    <div class="reveal-face reveal-front play-card" id="revealFront"></div>
+        <div id="rollSection">
+            <!-- How close the next guaranteed epic is -->
+            <section class="board-panel pity-banner">
+                <div class="pity-words">
+                    <span class="stat-label">Pity counter</span>
+                    <strong class="pity-title">Epic or better, guaranteed</strong>
+                    <span class="pity-bar" id="pityBar"></span>
+                    <p class="shop-pity" id="pity"></p>
                 </div>
-            </div>
-            <div class="shop-side">
-                <p class="admin-hint">Each roll gives a skin for a random card. A card's first skin goes straight on, and only you see your skins. Rolling one you already have gives some coins back.</p>
-                <button class="btn btn-primary shop-roll-button" id="rollButton" type="button">Roll</button>
-                <p class="shop-result" id="rollResult" aria-live="polite"></p>
-                <p class="menu-label">Odds</p>
-                <ul class="shop-odds" id="odds"></ul>
-                <p class="shop-pity" id="pity"></p>
-            </div>
-        </section>
+                <span class="pity-count" id="pityCount"></span>
+            </section>
+
+            <section class="board-panel shop-roll">
+                <!-- The card flips over to show what you rolled -->
+                <div class="reveal" id="reveal">
+                    <div class="reveal-inner" id="revealInner">
+                        <div class="reveal-face reveal-back play-card"><span class="reveal-logo">Dashcam<br>Bingo</span></div>
+                        <div class="reveal-face reveal-front play-card" id="revealFront"></div>
+                    </div>
+                </div>
+                <div class="shop-side">
+                    <h3 class="shop-heading">Skin crate</h3>
+                    <p class="admin-hint">Each roll gives a skin for a random card. A card's first skin goes straight on, and only you see your skins. Rolling one you already have gives some coins back.</p>
+                    <ul class="shop-odds" id="odds" aria-label="Odds"></ul>
+                    <button class="btn btn-primary shop-roll-button" id="rollButton" type="button">Roll</button>
+                    <p class="shop-result" id="rollResult" aria-live="polite"></p>
+                </div>
+            </section>
+        </div>
 
         <section>
             <div class="admin-tools shop-collection-tools">

@@ -22,10 +22,19 @@
 <body>
     <header class="top-bar room-bar">
         <div class="bar-side">
-            <span class="edition">AU Edition</span>
+            <a class="wordmark" href="/">Dashcam Bingo</a>
+            <nav class="bar-nav" aria-label="Pages">
+                <a class="pill" href="/" aria-current="page">Lobby</a>
+                <a class="pill" href="/leaderboard">Leaderboard</a>
+                <a class="pill" href="/leaderboard#cards">Cards</a>
+                <a class="pill" href="/shop">Shop</a>
+            </nav>
+            <nav class="path" id="roomPath" hidden aria-label="Location">
+                <a class="path-link" href="/">Lobby</a>
+            </nav>
         </div>
-        <h1 class="bar-title">Dashcam Bingo</h1>
         <div class="bar-side">
+            <span class="pill shop-coins my-coins bar-coins"></span>
             <!-- The room's own menu: invite, the host's video and round controls, the layout, and leaving -->
             <div class="account-menu room-menu" id="roomMenu" hidden>
                 <button class="account-button room-button" id="roomButton" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="roomPanel">
@@ -45,14 +54,14 @@
                                 <input class="link-input" id="videoLink" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link">
                                 <button class="btn" id="setVideoButton" type="submit">Change video</button>
                                 <label class="quality-label">Quality
-                                    <select class="quality-select" id="streamQuality" aria-label="Stream quality">
+                                    <select class="quality-select" id="streamQuality" aria-label="Video quality">
                                         <option value="auto">Auto</option>
                                         <option value="480">480p</option>
                                         <option value="720">720p</option>
                                         <option value="1080">1080p</option>
                                     </select>
                                 </label>
-                                <button class="btn btn-quiet" id="shareButton" type="button" title="Stream the video to everyone in the room">Share video</button>
+                                <button class="btn btn-quiet" id="shareButton" type="button" title="Send this video to everyone in the room">Share video</button>
                                 <p class="share-status" id="shareStatus" hidden></p>
                                 <p class="host-note" id="hostNote" hidden>
                                     <span id="hostMessage"></span>
@@ -167,10 +176,15 @@
             </div>
             <div class="lobby lobby-wide" id="lobby" hidden>
                 <div class="lobby-hello">
-                    <img class="lobby-avatar my-avatar" alt="">
-                    <div>
-                        <h2>G'day, <span class="my-name"></span></h2>
-                        <p>Ready for some dashcam bingo? Host a room for your mates, or jump into theirs.</p>
+                    <div class="lobby-hello-main">
+                        <img class="lobby-avatar my-avatar" alt="">
+                        <div class="lobby-hello-text">
+                            <h2>G'day, <span class="my-name"></span></h2>
+                            <p>Ready for some dashcam bingo? Host a room for your mates, or jump into theirs.</p>
+                            <div class="lobby-stats">
+                                <span class="pill my-wins"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="lobby-options">
@@ -188,7 +202,11 @@
                             Join a room
                         </h3>
                         <p>Type the 5-character code, or just open the invite link.</p>
-                        <input class="code-input" id="joinCode" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+                        <!-- One see-through input over five boxes that show what's typed, so paste and backspace just work -->
+                        <div class="code-boxes">
+                            <input class="code-input" id="joinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+                            <div class="code-slots" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                        </div>
                         <button class="btn" type="submit">Join room</button>
                     </form>
                     <div class="lobby-card">
@@ -200,7 +218,6 @@
                         <a class="btn" href="/solo">Play on your own</a>
                     </div>
                 </div>
-                <p class="lobby-solo"><a href="/leaderboard">See who's winning on the leaderboard</a></p>
                 <p class="lobby-error" id="lobbyError" hidden></p>
             </div>
             <form class="lobby lobby-setup" id="setup" hidden>
@@ -252,7 +269,7 @@
                                     <button class="pill sound-button" id="soundButton" type="button">🔊 Turn on sound</button>
                                     <label class="stream-volume-wrap">
                                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"/></svg>
-                                        <input class="stream-volume" id="streamVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Stream volume">
+                                        <input class="stream-volume" id="streamVolume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Video volume">
                                     </label>
                                 </div>
                             </div>

@@ -34,6 +34,7 @@ leaderboard.get("/api/leaderboard", signedIn, (req, res) => {
     const players = rankPlayers(store.profiles);
     res.json({
         players: players.slice(0, 50),
+        total: players.length,
         me: players.find(player => player.id === req.session.user.id) ?? null,
         cards: rankCards(store.cards, store.packs)
     });

@@ -18,19 +18,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="has-nav">
     <header class="top-bar">
         <div class="bar-side">
-            <a class="pill together-link" href="/" aria-label="Back to rooms">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                <span class="together-label">Back to rooms</span>
-            </a>
+            <a class="wordmark" href="/">Dashcam Bingo</a>
+            <nav class="bar-nav" aria-label="Pages">
+                <a class="pill" href="/">Lobby</a>
+                <a class="pill" href="/leaderboard">Leaderboard</a>
+                <a class="pill" href="/leaderboard#cards">Cards</a>
+                <a class="pill" href="/shop">Shop</a>
+            </nav>
         </div>
-        <h1 class="bar-title">Dashcam Bingo</h1>
         <div class="bar-side"></div>
     </header>
 
-    <main class="panel-page">
+    <main class="panel-page wide-page">
         <h2>Manage cards</h2>
         <div class="tabs" role="tablist">
             <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="suggestionsPanel" id="suggestionsTab">Suggestions</button>

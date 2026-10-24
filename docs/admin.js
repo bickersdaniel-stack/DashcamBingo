@@ -150,10 +150,14 @@ function showUsers() {
         wins.classList.add("wins-input");
         const winsLabel = el("label", "check-label", "🏆 ");
         winsLabel.append(wins);
-        const saveWins = button("Save", "btn btn-primary", () => change({ wins: Number(wins.value) }, `Saved ${user.name}'s wins.`));
-        showSaveWhenEdited(item, saveWins);
+        const coins = Object.assign(input(String(user.coins), 8, `Coins for ${user.name}`), { type: "number", min: 0, max: 1000000 });
+        coins.classList.add("wins-input", "coins-input");
+        const coinsLabel = el("label", "check-label", "🪙 ");
+        coinsLabel.append(coins);
+        const save = button("Save", "btn btn-primary", () => change({ wins: Number(wins.value), coins: Number(coins.value) }, `Saved ${user.name}'s wins and coins.`));
+        showSaveWhenEdited(item, save);
         item.append(Object.assign(el("img", "avatar"), { src: user.avatar, alt: "" }), who, ...tags.map(tag => el("span", `user-tag tag-${tag.toLowerCase()}`, tag)),
-            winsLabel, saveWins, el("span", "admin-stats", `Suggested ${user.suggested} · ${user.approved} added`));
+            winsLabel, coinsLabel, save, el("span", "admin-stats", `Suggested ${user.suggested} · ${user.approved} added`));
         if (!user.owner) {
             item.append(button(user.admin ? "Remove admin" : "Make admin", "btn btn-quiet",
                 () => change({ admin: !user.admin }, user.admin ? `${user.name} isn't an admin now.` : `${user.name} is an admin now.`)));

@@ -40,6 +40,7 @@ const qualities = {
 };
 
 if (me) {
+    document.body.classList.add("signed-in");
     $("account").hidden = false;
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
@@ -81,6 +82,8 @@ function showSignIn() {
 function show(...ids) {
     for (const id of ["signedOut", "lobby", "setup", "roomGone", "roomGrid"]) $(id).hidden = !ids.includes(id);
     document.body.classList.toggle("in-room", ids.includes("roomGrid"));
+    document.body.classList.toggle("in-lobby", !ids.includes("roomGrid")); // Sign-in and setup keep the lobby's look
+    $("roomPath").hidden = !ids.includes("roomGrid") && !ids.includes("roomGone");
 }
 
 function connect() {
@@ -120,6 +123,19 @@ function showLobby() {
             $("createButton").disabled = false;
         });
     });
+
+    // Letters and numbers only, shown one per box with the next box highlighted
+    const codeSlots = document.querySelectorAll(".code-slots span");
+    const showCode = () => {
+        const typed = $("joinCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+        $("joinCode").value = typed;
+        codeSlots.forEach((slot, i) => {
+            slot.textContent = typed[i] ?? "";
+            slot.classList.toggle("next", i === Math.min(typed.length, 4));
+        });
+    };
+    $("joinCode").addEventListener("input", showCode);
+    showCode();
 
     $("joinForm").addEventListener("submit", event => {
         event.preventDefault();
@@ -576,7 +592,7 @@ function showSharing() {
     const watching = [...viewers.values()].filter(peer => peer.connectionState === "connected").length;
     $("shareButton").textContent = shareStream ? "Stop sharing" : "Share video";
     $("shareStatus").hidden = !shareStream;
-    $("shareStatus").textContent = `● Live to ${watching} ${watching === 1 ? "person" : "people"}`;
+    $("shareStatus").textContent = `Sending to ${watching} ${watching === 1 ? "person" : "people"}`;
 }
 
 // Viewers join the host's stream by themselves whenever there is one, including after joining late or a refresh
@@ -675,7 +691,8 @@ function videoSecondsNow() {
 }
 
 function showMyWins(n) {
-    $("myWins").textContent = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
+    const text = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
+    document.querySelectorAll(".my-wins").forEach(el => { el.textContent = text; });
 }
 
 // The Leaderboard tile: the top five players and most spotted squares
@@ -728,7 +745,8 @@ async function showAchievements() {
 }
 
 function showMyCoins(n) {
-    $("myCoins").textContent = n === 1 ? "🪙 1 coin" : `🪙 ${n} coins`;
+    const text = n === 1 ? "🪙 1 coin" : `🪙 ${n} coins`;
+    document.querySelectorAll(".my-coins").forEach(el => { el.textContent = text; });
 }
 
 // "+1" floating up out of the square a coin was earned on

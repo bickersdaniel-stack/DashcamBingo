@@ -1,4 +1,4 @@
-// Admins see everyone who has joined a room, and can make admins, block people, and fix win counts
+// Admins see everyone who has joined a room, and can make admins, block people, and fix win and coin counts
 import { Router } from "express";
 import { isOwner } from "./auth.js";
 import { kickUser, refreshPlayer } from "./rooms.js";
@@ -13,7 +13,7 @@ users.get("/api/admin/users", adminOnly, (req, res) => {
         const theirs = store.suggestions.filter(s => s.by.id === id);
         return {
             id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", via: signedInWith(id),
-            wins: profile.wins ?? 0, seenAt: profile.seenAt ?? null,
+            wins: profile.wins ?? 0, coins: profile.coins ?? 0, seenAt: profile.seenAt ?? null,
             owner: isOwner(id), admin: isOwner(id) || profile.admin === true, blocked: profile.blocked === true,
             suggested: theirs.length, approved: theirs.filter(s => s.status === "approved").length
         };
@@ -22,8 +22,9 @@ users.get("/api/admin/users", adminOnly, (req, res) => {
 
 // What's wrong with a change to someone, if anything. Owners stay admins, and nobody can lock themselves out
 export function userChangeProblem(id, profile, changes, myId) {
-    const { wins, admin, blocked } = changes;
+    const { wins, coins, admin, blocked } = changes;
     if (wins !== undefined && !(Number.isInteger(wins) && wins >= 0 && wins <= 100_000)) return "Wins must be a whole number from 0 to 100000.";
+    if (coins !== undefined && !(Number.isInteger(coins) && coins >= 0 && coins <= 1_000_000)) return "Coins must be a whole number from 0 to 1000000.";
     if ([admin, blocked].some(value => value !== undefined && typeof value !== "boolean")) return "Admin and blocked are yes or no.";
     if (isOwner(id) && (admin === false || blocked === true)) return "Owners in ADMIN_IDS stay admins and can't be blocked.";
     if (id === myId && (admin === false || blocked === true)) return "You can't remove your own admin or block yourself.";
@@ -36,7 +37,7 @@ users.patch("/api/admin/users/:id", adminOnly, json, (req, res) => {
     const id = req.params.id;
     const profile = store.profiles[id];
     if (!profile) return res.status(404).json({ error: "Nobody with that id has joined a room." });
-    const changes = { wins: req.body?.wins, admin: req.body?.admin, blocked: req.body?.blocked };
+    const changes = { wins: req.body?.wins, coins: req.body?.coins, admin: req.body?.admin, blocked: req.body?.blocked };
     const problem = userChangeProblem(id, profile, changes, req.session.user.id);
     if (problem) return res.status(400).json({ error: problem });
     for (const [key, value] of Object.entries(changes)) if (value !== undefined) profile[key] = value;

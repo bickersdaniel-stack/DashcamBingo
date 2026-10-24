@@ -11,6 +11,12 @@ test("userChangeProblem keeps owners as admins and stops people locking themselv
     assert.equal(userChangeProblem("p1", player, { blocked: true }, "me"), null);
     assert.match(userChangeProblem("p1", player, { wins: -1 }, "me"), /whole number/);
     assert.match(userChangeProblem("p1", player, { wins: 1.5 }, "me"), /whole number/);
+    assert.equal(userChangeProblem("p1", player, { coins: 0 }, "me"), null);
+    assert.equal(userChangeProblem("p1", player, { coins: 2500 }, "me"), null);
+    assert.match(userChangeProblem("p1", player, { coins: -5 }, "me"), /Coins must be/);
+    assert.match(userChangeProblem("p1", player, { coins: 10.5 }, "me"), /Coins must be/);
+    assert.match(userChangeProblem("p1", player, { coins: "100" }, "me"), /Coins must be/);
+    assert.match(userChangeProblem("p1", player, { coins: 1_000_001 }, "me"), /Coins must be/);
     assert.match(userChangeProblem("p1", player, { admin: "yes" }, "me"), /yes or no/);
     assert.match(userChangeProblem("owner", {}, { admin: false }, "me"), /Owners/);
     assert.match(userChangeProblem("owner", {}, { blocked: true }, "me"), /Owners/);

@@ -31,6 +31,8 @@ function showCoins() {
     $("rollButton").title = shop.coins < shop.cost ? `You need ${shop.cost} coins. Earn them by spotting squares, getting bingo and unlocking achievements.` : "";
     const left = shop.pityAfter - shop.pity;
     $("pity").textContent = left <= 0 ? "Your next roll is an epic or better." : `An epic or better is guaranteed within ${left} roll${left === 1 ? "" : "s"}.`;
+    $("pityCount").textContent = `${Math.min(shop.pity, shop.pityAfter)} / ${shop.pityAfter}`;
+    $("pityBar").style.setProperty("--done", `${Math.min(shop.pity / shop.pityAfter, 1) * 100}%`);
 }
 
 async function roll() {
@@ -82,7 +84,10 @@ function showCollection() {
         const face = el("div", "play-card mini");
         const wearing = card.owned.find(skin => skin.id === card.equipped) ?? null;
         fillPlayCard(face, { name: card.text, note: card.description, packId: card.pack, packName: card.packName, skin: wearing });
-        item.append(face);
+        const head = el("div", "collection-head");
+        head.append(wearing ? el("span", `rarity-tag rarity-${wearing.rarity}`, wearing.rarity) : el("span", "rarity-tag", "No skin"),
+            el("span", "collection-owned", `${card.owned.length} owned`));
+        item.append(head, face);
         if (card.owned.length) {
             const choose = el("select", "quality-select");
             choose.ariaLabel = `Skin for ${card.text}`;

@@ -18,19 +18,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="has-nav">
     <header class="top-bar">
         <div class="bar-side">
-            <a class="pill together-link" href="/" aria-label="Back to rooms">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
-                <span class="together-label">Back to rooms</span>
-            </a>
+            <a class="wordmark" href="/">Dashcam Bingo</a>
+            <nav class="bar-nav" aria-label="Pages">
+                <a class="pill" href="/">Lobby</a>
+                <a class="pill" href="/leaderboard" id="navLeaderboard" aria-current="page">Leaderboard</a>
+                <a class="pill" href="/leaderboard#cards" id="navCards">Cards</a>
+                <a class="pill" href="/shop">Shop</a>
+            </nav>
         </div>
-        <h1 class="bar-title">Dashcam Bingo</h1>
-        <div class="bar-side"></div>
+        <div class="bar-side">
+            <span class="pill shop-coins" id="coins"></span>
+        </div>
     </header>
 
-    <main class="panel-page">
+    <main class="panel-page board-page" id="boardPage">
         <h2>Leaderboard</h2>
         <div class="tabs" role="tablist">
             <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
@@ -39,9 +43,34 @@
         <p class="email-message error" id="boardMessage" role="status" hidden></p>
 
         <section class="admin-panel" id="playersPanel" role="tabpanel">
-            <p class="admin-hint">Most bingos across every room.</p>
-            <ol class="item-list board-list" id="playerBoard"></ol>
-            <ol class="item-list board-list board-me" id="myPlace" hidden></ol>
+            <div class="stat-tiles">
+                <div class="stat-tile"><span class="stat-label">Your bingos</span><strong class="stat-value" id="statWins">–</strong></div>
+                <div class="stat-tile"><span class="stat-label">Coins</span><strong class="stat-value stat-coins" id="statCoins">–</strong></div>
+                <div class="stat-tile"><span class="stat-label">Your place</span><strong class="stat-value" id="statRank">–</strong><span class="stat-note" id="statRankNote"></span></div>
+                <div class="stat-tile"><span class="stat-label">Achievements</span><strong class="stat-value" id="statAchievements">–</strong><span class="stat-note">Each pays coins</span></div>
+            </div>
+            <div class="board-layout">
+                <div class="board-main">
+                    <ol class="podium" id="podium" aria-label="Top three"></ol>
+                    <div class="board-panel">
+                        <div class="board-panel-head">
+                            <h3>All players</h3>
+                            <span class="admin-count" id="playerCount"></span>
+                        </div>
+                        <p class="admin-hint">Most bingos across every room.</p>
+                        <ol class="item-list board-list" id="playerBoard"></ol>
+                        <ol class="item-list board-list board-me" id="myPlace" hidden></ol>
+                    </div>
+                </div>
+                <aside class="board-panel">
+                    <div class="board-panel-head">
+                        <h3>Up next</h3>
+                        <span class="admin-count" id="achievementCount"></span>
+                    </div>
+                    <p class="admin-hint">The achievements you're closest to.</p>
+                    <ul class="milestones" id="milestones"></ul>
+                </aside>
+            </div>
         </section>
 
         <section class="admin-panel" id="cardsPanel" role="tabpanel" hidden>

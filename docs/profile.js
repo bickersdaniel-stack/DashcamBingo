@@ -11,9 +11,15 @@ function el(tag, className, text) {
     return node;
 }
 
-// A name that opens its player's profile
+// A player's picture, in the frame they wear
+export function avatarOf(player, className = "avatar") {
+    return Object.assign(el("img", player.frame ? `${className} frame-${player.frame}` : className), { src: player.avatar, alt: "" });
+}
+
+// A name, with their title under it, that opens its player's profile
 export function profileLink(player, className, text = player.name) {
     const button = el("button", `${className} profile-link`, text);
+    if (player.title) button.append(el("small", "player-title", player.title));
     button.type = "button";
     button.addEventListener("click", event => {
         event.stopPropagation();
@@ -31,8 +37,12 @@ export async function openProfile(id) {
     part("error").hidden = response.ok;
     part("body").hidden = !response.ok;
     if (response.ok) {
-        part("avatar").src = data.avatar;
+        part("avatar").replaceWith(avatarOf(data, "avatar profile-avatar"));
         part("name").textContent = data.name; // textContent: names are untrusted
+        part("title").textContent = data.title ?? "";
+        part("title").hidden = !data.title;
+        part("banner").className = `profile-banner${data.banner ? ` banner-${data.banner}` : ""}`;
+        part("banner").hidden = !data.banner;
         part("stats").textContent = [data.wins === 1 ? "🏆 1 bingo" : `🏆 ${data.wins} bingos`,
             ...(data.rank ? [`#${data.rank} on the leaderboard`] : []), `${data.skins} skin${data.skins === 1 ? "" : "s"}`].join(" · ");
         if (data.showcase) {
@@ -59,10 +69,12 @@ function makeDialog() {
     node.innerHTML = `
         <p class="email-message error profile-error" role="status" hidden></p>
         <div class="profile-body">
+            <div class="profile-banner" hidden></div>
             <div class="profile-head">
                 <img class="avatar profile-avatar" alt="">
                 <div>
                     <h2 class="profile-name"></h2>
+                    <p class="player-title profile-title" hidden></p>
                     <p class="admin-hint profile-stats"></p>
                 </div>
             </div>

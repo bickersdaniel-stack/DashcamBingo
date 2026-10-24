@@ -1,10 +1,12 @@
-// Shop page: roll for card skins with coins from playing and watch the card flip. Wearing them is on the Cards page
+// Shop page: roll for card skins with coins from playing and watch the card flip (wearing them is on the Cards page),
+// and buy and wear extras
 import { fillPlayCard } from "./playcard.js";
 import { coinsText, showNewSkins } from "./nav.js";
 
 const $ = id => document.getElementById(id);
 let shop = null;
 let rolling = false;
+const kinds = { frame: "Frames", title: "Titles", banner: "Banners" };
 
 $("rollButton").addEventListener("click", roll);
 
@@ -23,6 +25,7 @@ if (!loaded.ok) {
 }
 
 function showCoins() {
+    if (shop.extras) showExtras(); // What you can afford changes with your coins
     document.querySelectorAll(".my-coins").forEach(el => el.textContent = coinsText(shop.coins)); // The bar and the menu
     $("rollButton").textContent = rolling ? "Rolling…" : `${$("rollResult").hasChildNodes() ? "Roll again" : "Roll"} · ${shop.cost} 🪙`;
     $("rollButton").disabled = rolling || shop.coins < shop.cost;
@@ -64,6 +67,53 @@ async function roll() {
     $("rollResult").replaceChildren(line, note,
         ...achievements.map(a => el("p", "roll-achievement", `🏆 ${a.name} unlocked${a.coins ? ` · +${a.coins} 🪙` : ""}`)));
     showCoins();
+}
+
+function showExtras() {
+    $("extras").replaceChildren(...Object.entries(kinds).map(([kind, label]) => {
+        const list = el("div", "extra-list");
+        list.append(...shop.extras.filter(extra => extra.kind === kind).map(extraItem));
+        const group = el("div", "extra-group");
+        group.append(el("p", "menu-label", label), list);
+        return group;
+    }));
+}
+
+// What it looks like, its name, and Buy, Wear, or (pressed) Wearing to take it off
+function extraItem(extra) {
+    const owned = shop.owned.includes(extra.id);
+    const wearing = shop.wearing[extra.kind] === extra.id;
+    const item = el("div", `extra${wearing ? " wearing" : ""}`);
+    if (extra.kind === "frame") item.append(Object.assign(el("img", `avatar extra-avatar frame-${extra.id}`), { src: shop.avatar, alt: "" }));
+    if (extra.kind === "banner") item.append(el("span", `extra-banner banner-${extra.id}`));
+    item.append(el("strong", extra.kind === "title" ? "extra-name player-title" : "extra-name", extra.name));
+    const button = el("button", `btn ${owned ? "btn-quiet" : "btn-primary"} extra-button`, wearing ? "✓ Wearing" : owned ? "Wear" : `${extra.price} 🪙`);
+    button.type = "button";
+    if (owned) button.setAttribute("aria-pressed", wearing);
+    else button.disabled = shop.coins < extra.price;
+    button.ariaLabel = `${wearing ? "Take off" : owned ? "Wear" : `Buy for ${extra.price} coins:`} ${extra.name}`;
+    button.addEventListener("click", () => owned ? wear(extra.kind, wearing ? null : extra.id) : buyExtra(extra.id));
+    item.append(button);
+    return item;
+}
+
+async function buyExtra(id) {
+    const result = await api("POST", "/api/shop/extras/buy", { id });
+    showExtrasError(result);
+    if (result.ok) Object.assign(shop, result.data); // coins, owned, wearing
+    showCoins();
+}
+
+async function wear(kind, id) {
+    const result = await api("POST", "/api/me/wear", { kind, id });
+    showExtrasError(result);
+    if (result.ok) shop.wearing = result.data.wearing;
+    showExtras();
+}
+
+function showExtrasError(result) {
+    $("extrasMessage").textContent = result.ok ? "" : result.data.error;
+    $("extrasMessage").hidden = result.ok;
 }
 
 function message(text) {

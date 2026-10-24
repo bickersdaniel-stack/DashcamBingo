@@ -4,6 +4,7 @@
 import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { recordProgress } from "./achievements.js";
+import { refreshPlayer } from "./rooms.js";
 import { save, store, touchProfile } from "./store.js";
 import { json, signedIn } from "./suggestions.js";
 
@@ -33,6 +34,52 @@ export const styles = [
     { id: "southern-cross", name: "Southern Cross", rarity: "legendary" }
 ];
 const isTopShelf = rarity => rarity === "epic" || rarity === "legendary";
+
+// Everything else the shop sells, bought once and worn in its slot (kind). Frames and banners are drawn in
+// styles.css (.frame-<id>, .banner-<id>); a title is its name under yours. Ids are unique across every kind
+export const extras = [
+    { id: "gold-ring", kind: "frame", name: "Gold ring", price: 300 },
+    { id: "hazard-tape", kind: "frame", name: "Hazard tape", price: 250 },
+    { id: "police-lights", kind: "frame", name: "Police lights", price: 600 },
+    { id: "rainbow-road", kind: "frame", name: "Rainbow road", price: 800 },
+    { id: "backseat-driver", kind: "title", name: "Backseat driver", price: 150 },
+    { id: "indicator-enthusiast", kind: "title", name: "Indicator enthusiast", price: 150 },
+    { id: "roundabout-royalty", kind: "title", name: "Roundabout royalty", price: 200 },
+    { id: "certified-hoon", kind: "title", name: "Certified hoon", price: 200 },
+    { id: "lollipop-person", kind: "title", name: "Lollipop person", price: 250 },
+    { id: "road-warrior", kind: "title", name: "Road warrior", price: 400 },
+    { id: "outback-dusk", kind: "banner", name: "Outback dusk", price: 300 },
+    { id: "coastal-road", kind: "banner", name: "Coastal road", price: 300 },
+    { id: "fresh-bitumen", kind: "banner", name: "Fresh bitumen", price: 400 },
+    { id: "night-drive", kind: "banner", name: "Night drive", price: 600 }
+];
+export const wearable = ["frame", "title", "banner"];
+
+// How someone looks to everyone else: their frame and banner ids, and their title's words
+export function lookOf(profile) {
+    const worn = kind => extras.find(e => e.kind === kind && e.id === profile.wearing?.[kind]);
+    return { frame: worn("frame")?.id ?? null, title: worn("title")?.name ?? null, banner: worn("banner")?.id ?? null };
+}
+
+// Buys an extra, which goes straight on if nothing's in its slot. Returns what you have now, or { error }
+export function buyExtra(profile, id) {
+    const extra = extras.find(e => e.id === id);
+    if (!extra) return { error: "That isn't in the shop." };
+    if (profile.extras?.includes(id)) return { error: "You already own that." };
+    if ((profile.coins ?? 0) < extra.price) return { error: `That costs ${extra.price} coins.` };
+    profile.coins -= extra.price;
+    (profile.extras ??= []).push(id);
+    if (wearable.includes(extra.kind)) (profile.wearing ??= {})[extra.kind] ??= id;
+    return { coins: profile.coins, owned: profile.extras, wearing: profile.wearing ?? {} };
+}
+
+// Puts on an extra you own in its slot, or takes that slot off (id: null)
+export function wearExtra(profile, kind, id) {
+    if (!wearable.includes(kind)) return { error: "That can't be worn." };
+    if (id !== null && !(profile.extras?.includes(id) && extras.find(e => e.id === id)?.kind === kind)) return { error: "You don't own that." };
+    (profile.wearing ??= {})[kind] = id;
+    return { wearing: profile.wearing };
+}
 
 // A skin as the room and shop show it, or null
 export const skinInfo = styleId => {
@@ -102,7 +149,8 @@ shop.get("/api/shop", signedIn, (req, res) => {
     const total = rarities.reduce((sum, r) => sum + r.weight, 0);
     res.json({
         coins: profile.coins ?? 0, cost: rollCost, refund: duplicateRefund, pity: profile.pity ?? 0, pityAfter, newSkins: profile.newSkins?.length ?? 0,
-        rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100), price: r.price })), styles
+        rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100), price: r.price })), styles,
+        extras, owned: profile.extras ?? [], wearing: profile.wearing ?? {}, avatar: req.session.user.avatar
     });
 });
 
@@ -120,6 +168,23 @@ shop.post("/api/shop/buy", signedIn, json, (req, res) => {
     const result = buySkin(profile, store.cards.find(card => card.id === req.body?.cardId), req.body?.style);
     if (result.error) return res.status(400).json(result);
     save();
+    res.json(result);
+});
+
+shop.post("/api/shop/extras/buy", signedIn, json, (req, res) => {
+    const profile = store.profiles[req.session.user.id] ??= { wins: 0 };
+    const result = buyExtra(profile, req.body?.id);
+    if (result.error) return res.status(400).json(result);
+    save();
+    refreshPlayer(req.session.user.id); // Rooms you're in show it straight away
+    res.json(result);
+});
+
+shop.post("/api/me/wear", signedIn, json, (req, res) => {
+    const result = wearExtra(store.profiles[req.session.user.id] ?? {}, req.body?.kind, req.body?.id ?? null);
+    if (result.error) return res.status(400).json(result);
+    save();
+    refreshPlayer(req.session.user.id);
     res.json(result);
 });
 

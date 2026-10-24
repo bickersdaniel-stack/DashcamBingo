@@ -1,5 +1,5 @@
 // Leaderboard rows, shared by the leaderboard page and the room's Leaderboard tile
-import { profileLink } from "./profile.js";
+import { avatarOf, profileLink } from "./profile.js";
 
 const medals = { 1: "gold", 2: "silver", 3: "bronze" };
 
@@ -14,7 +14,7 @@ export function playerRow(player, isMe = false) {
     const row = el("li", `item board-row${isMe ? " me" : ""}`);
     row.append(
         el("span", `board-rank ${medals[player.rank] ?? ""}`, `#${player.rank}`),
-        Object.assign(el("img", "avatar"), { src: player.avatar, alt: "" }),
+        avatarOf(player),
         profileLink(player, "item-text", isMe ? `${player.name} (you)` : player.name),
         el("span", "board-score", player.wins === 1 ? "🏆 1 bingo" : `🏆 ${player.wins} bingos`)
     );

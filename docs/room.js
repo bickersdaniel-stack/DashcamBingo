@@ -3,7 +3,7 @@ import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { cardRow, playerRow } from "./board.js";
 import { fillPlayCard, wearSkin } from "./playcard.js";
-import { openProfile, profileLink } from "./profile.js";
+import { avatarOf, openProfile, profileLink } from "./profile.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -858,7 +858,7 @@ function playerById(id) {
 }
 
 function avatar(player) {
-    return Object.assign(el("img", "avatar"), { src: player.avatar, alt: "" });
+    return avatarOf(player);
 }
 
 function el(tag, className, text) {

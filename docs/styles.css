@@ -2596,6 +2596,52 @@ body.in-room .stage {
     font-size: 16px;
     color: var(--heading);
 }
+/* Extras: everything the shop sells besides skins, bought once and worn in a slot */
+.shop-extras {
+    padding: 24px;
+}
+.shop-extras > .admin-hint {
+    margin: 6px 0 0;
+}
+.extra-group .menu-label {
+    margin: 18px 0 8px;
+}
+.extra-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+.extra {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-align: center;
+}
+.extra.wearing {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.extra-avatar {
+    width: 44px;
+    height: 44px;
+}
+.extra-banner {
+    align-self: stretch;
+    height: 40px;
+    border-radius: 8px;
+}
+.extra-name {
+    font-size: 13px;
+    color: var(--heading);
+}
+.extra-button {
+    width: 100%;
+    margin-top: auto;
+}
 .collection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -3269,6 +3315,69 @@ button.collection-item:focus-visible {
 }
 .profile-showcase {
     margin: 0 auto;
+}
+.profile-banner {
+    height: 72px;
+    margin: -24px -24px 16px;
+    border-radius: 16px 16px 0 0;
+}
+.profile-head .player-title {
+    margin: 0 0 2px;
+    font-size: 12px;
+}
+/* A title someone wears, under their name */
+.player-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--amber);
+}
+/* Frames, round someone's picture wherever it shows. Each has a still ring for when motion is turned off */
+.frame-gold-ring {
+    box-shadow: 0 0 0 2px #fbbf24, 0 0 8px rgba(251, 191, 36, 0.6);
+}
+.frame-hazard-tape {
+    box-shadow: 0 0 0 3px #1c1917;
+    outline: 3px dashed #facc15;
+}
+.frame-police-lights {
+    box-shadow: 0 0 0 2px #ef4444, 0 0 0 4px #3b82f6;
+    animation: police-lights 0.8s steps(1) infinite;
+}
+@keyframes police-lights {
+    0% { box-shadow: 0 0 0 2px #ef4444, 0 0 10px #ef4444; }
+    50% { box-shadow: 0 0 0 2px #3b82f6, 0 0 10px #3b82f6; }
+}
+.frame-rainbow-road {
+    box-shadow: 0 0 0 2px #a855f7;
+    animation: rainbow-road 3s linear infinite;
+}
+@keyframes rainbow-road {
+    0%, 100% { box-shadow: 0 0 0 2px #ef4444, 0 0 8px #ef4444; }
+    17% { box-shadow: 0 0 0 2px #f97316, 0 0 8px #f97316; }
+    33% { box-shadow: 0 0 0 2px #eab308, 0 0 8px #eab308; }
+    50% { box-shadow: 0 0 0 2px #22c55e, 0 0 8px #22c55e; }
+    67% { box-shadow: 0 0 0 2px #3b82f6, 0 0 8px #3b82f6; }
+    83% { box-shadow: 0 0 0 2px #a855f7, 0 0 8px #a855f7; }
+}
+/* Banners, across the top of someone's profile */
+.banner-outback-dusk {
+    background: linear-gradient(160deg, #fb923c, #b45309 55%, #451a03);
+}
+.banner-coastal-road {
+    background: linear-gradient(180deg, #38bdf8, #0e7490 60%, #fcd34d 61%, #f59e0b);
+}
+.banner-fresh-bitumen {
+    background: repeating-linear-gradient(90deg, #facc15 0 26px, transparent 26px 46px) center / 100% 4px no-repeat, #27272a;
+}
+.banner-night-drive {
+    background:
+        radial-gradient(circle at 18% 30%, #fde68a 0 2px, transparent 3px),
+        radial-gradient(circle at 52% 62%, #fde68a 0 2px, transparent 3px),
+        radial-gradient(circle at 82% 26%, #ffffff 0 1.5px, transparent 2.5px),
+        linear-gradient(180deg, #0f172a, #1e3a8a);
 }
 .achievement-toast {
     position: fixed;

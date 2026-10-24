@@ -1,7 +1,7 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
-import { skinInfo } from "./shop.js";
+import { lookOf, skinInfo } from "./shop.js";
 import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
@@ -275,7 +275,7 @@ export function kickUser(userId) {
     }
 }
 
-// An admin changed someone's wins: rooms they're in show the new count
+// An admin changed someone's wins, or they put on a frame or title: rooms they're in show it
 export function refreshPlayer(userId) {
     for (const room of rooms.values()) {
         const player = room.players.get(userId);
@@ -425,7 +425,7 @@ function addEvent(io, room, event) {
 function playerInfo(room, player) {
     const card = room.round.cards.get(player.id);
     return {
-        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins,
+        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, ...lookOf(store.profiles[player.id] ?? {}),
         connected: room.connections.get(player.id) > 0,
         marked: card ? card.marked.size : 0,
         oneAway: card ? isOneAway(card.marked) : false

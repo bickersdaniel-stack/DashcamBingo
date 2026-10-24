@@ -1,7 +1,7 @@
 // Who has won the most, and which cards turn up the most. For signed-in players only, since it shows names
 import { Router } from "express";
 import { achievements } from "./achievements.js";
-import { skinInfo } from "./shop.js";
+import { lookOf, skinInfo } from "./shop.js";
 import { store } from "./store.js";
 import { signedIn } from "./suggestions.js";
 
@@ -13,7 +13,7 @@ const rareCount = 5;  // The least spotted cards with enough games get flagged a
 export function rankPlayers(profiles) {
     const rows = Object.entries(profiles)
         .filter(([, profile]) => (profile.wins ?? 0) > 0 && !profile.blocked)
-        .map(([id, profile]) => ({ id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", wins: profile.wins }))
+        .map(([id, profile]) => ({ id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", wins: profile.wins, ...lookOf(profile) }))
         .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
     rows.forEach((row, i) => row.rank = i > 0 && row.wins === rows[i - 1].wins ? rows[i - 1].rank : i + 1);
     return rows;
@@ -42,7 +42,7 @@ export function profileOf(id, profiles, cards, packs) {
     if (!profile || profile.blocked) return null;
     const card = cards.find(card => card.id === profile.showcase); // Gone if an admin deleted it
     return {
-        id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", wins: profile.wins ?? 0,
+        id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", wins: profile.wins ?? 0, ...lookOf(profile),
         rank: rankPlayers(profiles).find(row => row.id === id)?.rank ?? null,
         skins: Object.values(profile.skins ?? {}).reduce((sum, entry) => sum + entry.owned.length, 0),
         achievements: achievements.filter(a => profile.achievements?.[a.id])

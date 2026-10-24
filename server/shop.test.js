@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buySkin } from "./shop.js";
+import { buyExtra, buySkin, lookOf, wearExtra } from "./shop.js";
 
 const card = { id: "c1" };
 
@@ -19,4 +19,23 @@ test("buySkin charges the rarity's price, puts a card's first skin on, and refus
     assert.equal(profile.stats.skins, 2);
     assert.equal(profile.stats.legendaries, undefined, "buying isn't rolling");
     assert.equal(buySkin({ coins: 0 }, card, "matte").error, "That skin costs 150 coins.");
+});
+
+test("buyExtra puts it straight on an empty slot, and wearExtra only wears what you own, in its own slot", () => {
+    const profile = { coins: 500 };
+    assert.match(buyExtra(profile, "nope").error, /isn't in the shop/);
+    assert.deepEqual(buyExtra(profile, "gold-ring"), { coins: 200, owned: ["gold-ring"], wearing: { frame: "gold-ring" } });
+    assert.match(buyExtra(profile, "gold-ring").error, /already own/);
+    assert.match(buyExtra(profile, "police-lights").error, /costs 600/);
+    profile.coins += 1000;
+    buyExtra(profile, "backseat-driver");
+    buyExtra(profile, "hazard-tape");
+    assert.equal(profile.wearing.frame, "gold-ring", "a full slot stays as it was");
+    assert.deepEqual(lookOf(profile), { frame: "gold-ring", title: "Backseat driver", banner: null });
+    assert.match(wearExtra(profile, "frame", "police-lights").error, /don't own/);
+    assert.match(wearExtra(profile, "title", "hazard-tape").error, /don't own/, "a frame isn't a title");
+    assert.match(wearExtra(profile, "coins", null).error, /can't be worn/);
+    wearExtra(profile, "frame", "hazard-tape");
+    wearExtra(profile, "title", null);
+    assert.deepEqual(lookOf(profile), { frame: "hazard-tape", title: null, banner: null });
 });

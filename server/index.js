@@ -11,6 +11,7 @@ import { cardsIn, defaultPacks, store } from "./store.js";
 import { suggestions } from "./suggestions.js";
 import { users } from "./users.js";
 import { leaderboard } from "./leaderboard.js";
+import { achievementRoutes } from "./achievements.js";
 import { setupRooms } from "./rooms.js";
 
 for (const key of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SESSION_SECRET", "PUBLIC_URL"]) {
@@ -42,6 +43,7 @@ app.use(suggestions);
 app.use(cards);
 app.use(users);
 app.use(leaderboard);
+app.use(achievementRoutes);
 app.get("/healthz", (req, res) => res.send("ok"));
 // The solo game here deals from the packs that are on by default (or every card, if they hold too few for a card)
 app.get("/phrases.txt", (req, res) => {

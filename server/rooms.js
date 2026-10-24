@@ -1,5 +1,6 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
+import { recordProgress, sydneyHour } from "./achievements.js";
 import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
@@ -76,8 +77,10 @@ export function setupRooms(io) {
             if (!change) return;
 
             let gained = change.coin ? earnCountCoin(user.id) : 0;
+            const phrase = card.phrases[index];
             countSpot(card.ids[index], change.marked ? 1 : change.unmarked ? -1 : 0, delta);
-            if (delta > 0) spot(io, room, player, card.phrases[index]); // Each sighting can show in the feed
+            const first = delta > 0 && spot(io, room, player, phrase); // Each sighting can show in the feed
+            const moment = { count: change.count, marked: card.marked.size, hour: sydneyHour() };
             if (change.marked) {
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
@@ -85,6 +88,7 @@ export function setupRooms(io) {
                         player.wins = addWin(user.id);
                         addCoins(user.id, bingoCoins);
                         gained += bingoCoins;
+                        moment.bingoMs = Date.now() - room.round.startedAt;
                     }
                     card.bestLines = lines;
                     addEvent(io, room, { type: "win", userId: user.id, lines });
@@ -93,6 +97,11 @@ export function setupRooms(io) {
                 unspot(io, room, player, card.phrases[index]);
                 if (card.bestLines > 0 && countLines(card.marked) === 0) unwin(io, room, player, card);
             }
+            const one = happened => happened ? 1 : 0;
+            progress(io, room, user.id, {
+                counts: one(delta > 0), takeBacks: one(delta < 0), firsts: one(first),
+                swears: one(delta > 0 && /^says\b/i.test(phrase)), utes: one(delta > 0 && /\bute/i.test(phrase))
+            }, moment);
             io.to(room.code).emit("player:update", playerInfo(room, player));
             if (typeof reply === "function") reply({ gained, coins: coinsOf(user.id) });
         });
@@ -103,7 +112,11 @@ export function setupRooms(io) {
             if (!room || room.hostId !== user.id) return;
             // A round nobody has touched yet (like a new room's first) is replaced, keeping its number and skipping results
             const untouched = room.round.events.length === 0 && [...room.round.cards.values()].every(card => card.marked.size === 0);
-            if (!untouched) room.lastRound = roundSummary(room);
+            if (!untouched) {
+                room.lastRound = roundSummary(room);
+                for (const [id, card] of room.round.cards) if (card.bestLines === 0 && isOneAway(card.marked)) progress(io, room, id, { soClose: 1 });
+                progress(io, room, user.id, { roundsHosted: 1 });
+            }
             startRound(room, videoFrom(data), untouched);
             for (const other of await io.in(room.code).fetchSockets()) other.emit("room:state", stateFor(room, other.data.userId));
         });
@@ -132,6 +145,7 @@ export function setupRooms(io) {
             const card = room?.round.cards.get(user.id);
             if (!room || data?.round !== room.round.id || !canReroll(room, card)) return;
             room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1 }));
+            progress(io, room, user.id, { rerolls: 1 });
             socket.emit("room:state", stateFor(room, user.id));
             io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
         });
@@ -350,12 +364,30 @@ function spot(io, room, player, phrase) {
     if (now - player.lastSpotAt < spotGapMs) return; // At most one spot a second each
     player.lastSpotAt = now;
     const recent = room.round.events.findLast(event => event.type === "spot" && event.phrase === phrase && now - event.at < spotMergeMs);
-    if (!recent) return addEvent(io, room, { type: "spot", phrase, userIds: [player.id], cleared: [] });
+    if (!recent) { // First in the room to spot it (lately), which counts towards Eagle eye
+        addEvent(io, room, { type: "spot", phrase, userIds: [player.id], cleared: [] });
+        return true;
+    }
     const cleared = recent.cleared ?? [];
     if (recent.userIds.includes(player.id) && !cleared.includes(player.id)) return;
     recent.cleared = cleared.filter(id => id !== player.id);
     if (!recent.userIds.includes(player.id)) recent.userIds.push(player.id);
     io.to(room.code).emit("event", recent);
+}
+
+// Adds to someone's lifetime stats, and tells them (with a pop-up) and the room (in the feed) about anything that unlocks
+function progress(io, room, userId, changes, moment) {
+    const profile = store.profiles[userId] ??= { wins: 0 };
+    const earned = recordProgress(profile, changes, moment);
+    save();
+    for (const a of earned) {
+        addEvent(io, room, { type: "achievement", userId, name: a.name });
+        for (const other of io.sockets.sockets.values()) {
+            if (other.data.userId === userId && other.data.code === room.code) {
+                other.emit("achievement", { name: a.name, description: a.description, coins: a.coins, total: profile.coins });
+            }
+        }
+    }
 }
 
 function unspot(io, room, player, phrase) {

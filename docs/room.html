@@ -117,6 +117,10 @@
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
                             Suggest a square
                         </button>
+                        <button class="menu-item" id="achievementsButton" type="button">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a6 6 0 100-12 6 6 0 000 12zm0 0l-4 6 1.5-4.5L5 15m7 0l4 6-1.5-4.5L19 15"/></svg>
+                            Achievements
+                        </button>
                         <a class="menu-item" href="/leaderboard">
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8m-4-4v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v2a3 3 0 003 3m10-5h3v2a3 3 0 01-3 3"/></svg>
                             Leaderboard
@@ -386,6 +390,15 @@
             </div>
         </form>
     </dialog>
+
+    <dialog class="panel-dialog" id="achievementsDialog" aria-labelledby="achievementsTitle">
+        <h2 id="achievementsTitle">Achievements</h2>
+        <p id="achievementsSummary"></p>
+        <ul class="item-list achievement-list" id="achievementList"></ul>
+        <form class="dialog-close" method="dialog"><button class="btn btn-quiet" type="submit">Close</button></form>
+    </dialog>
+
+    <div class="achievement-toast" id="achievementToast" role="status" hidden></div>
 
     <div class="card-tip" id="cardTip" role="tooltip" hidden></div>
 

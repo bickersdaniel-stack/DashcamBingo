@@ -59,3 +59,22 @@ test("rankCards ranks cards with enough games by spotted rate and flags the leas
     assert.deepEqual(rows.filter(r => r.rare).map(r => r.id), ["c3", "c4", "c5", "c6", "c7"]);
     assert.equal(rows[0].pack, "Core");
 });
+
+test("recordProgress unlocks achievements once, pays their coins, and handles one-off moments", async () => {
+    const { recordProgress } = await import("./achievements.js");
+    const profile = { wins: 1, coins: 0 };
+    let earned = recordProgress(profile, { counts: 1 });
+    assert.deepEqual(earned.map(a => a.id), ["first-blood"], "wins on the profile count");
+    assert.equal(profile.coins, 20);
+    assert.deepEqual(recordProgress(profile, { counts: 1 }), [], "only once");
+
+    for (let i = 0; i < 19; i++) recordProgress(profile, { swears: 1 });
+    assert.deepEqual(recordProgress(profile, { swears: 1 }).map(a => a.id), ["potty-mouth"]);
+    assert.equal(profile.stats.swears, 20);
+
+    assert.deepEqual(recordProgress(profile, {}, { count: 5 }).map(a => a.id), ["tally-ho"]);
+    assert.deepEqual(recordProgress(profile, {}, { marked: 24 }).map(a => a.id), ["blackout"]);
+    assert.deepEqual(recordProgress(profile, {}, { bingoMs: 60_000 }).map(a => a.id), ["speedrun"]);
+    assert.deepEqual(recordProgress(profile, {}, { hour: 2 }).map(a => a.id), ["night-shift"]);
+    assert.deepEqual(recordProgress(profile, {}, { bingoMs: 600_000, hour: 12, count: 2, marked: 3 }), [], "nothing for an ordinary moment");
+});

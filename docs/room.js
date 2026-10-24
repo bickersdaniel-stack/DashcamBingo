@@ -205,6 +205,10 @@ function joinRoom() {
         showReroll();
         showRerollLock();
     });
+    socket.on("achievement", achievement => {
+        showMyCoins(achievement.total);
+        showAchievementToast(achievement);
+    });
     socket.on("packs:update", packs => {
         if (state) state.packs = packs;
     });
@@ -679,6 +683,44 @@ async function showMiniBoard() {
     $("miniCards").replaceChildren(...(cards.length ? cards : [none("Not enough games yet.")]));
 }
 
+// A pop-up at the top when you unlock an achievement; a second one waits for the first to go
+const toastQueue = [];
+function showAchievementToast(achievement) {
+    toastQueue.push(achievement);
+    if (toastQueue.length > 1) return;
+    const next = () => {
+        const { name, description, coins } = toastQueue[0];
+        const words = el("span", "toast-words");
+        words.append(el("strong", "", `Achievement unlocked: ${name}`), el("span", "", description));
+        $("achievementToast").replaceChildren(el("span", "toast-medal", "🏆"), words, ...(coins ? [el("span", "toast-coins", `+${coins} 🪙`)] : []));
+        $("achievementToast").hidden = false;
+        setTimeout(() => {
+            $("achievementToast").hidden = true;
+            toastQueue.shift();
+            if (toastQueue.length) setTimeout(next, 300);
+        }, 5000);
+    };
+    next();
+}
+
+// Everything there is to earn, with what you've got and how close you are to the rest
+async function showAchievements() {
+    const { ok, data } = await api("GET", "/api/me/achievements");
+    if (!ok) return;
+    const earned = data.filter(a => a.earnedAt).length;
+    $("achievementsSummary").textContent = `${earned} of ${data.length} earned. Each one pays coins for the shop.`;
+    $("achievementList").replaceChildren(...data.map(a => {
+        const item = el("li", a.earnedAt ? "item achievement earned" : "item achievement");
+        const words = el("span", "item-text");
+        words.append(el("strong", "", a.name), el("span", "item-note", a.description));
+        item.append(el("span", "achievement-medal", a.earnedAt ? "🏆" : "🔒"), words);
+        if (a.progress && !a.earnedAt) item.append(el("span", "achievement-progress", `${a.progress[0]}/${a.progress[1]}`));
+        if (a.coins) item.append(el("span", "toast-coins", `${a.coins} 🪙`));
+        return item;
+    }));
+    $("achievementsDialog").showModal();
+}
+
 function showMyCoins(n) {
     $("myCoins").textContent = n === 1 ? "🪙 1 coin" : `🪙 ${n} coins`;
 }
@@ -714,6 +756,7 @@ function showFeed() {
         if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
         else if (event.type === "host") text.append(`👑 ${names} is now the host`);
         else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
+        else if (event.type === "achievement") text.append(`🏆 ${names} unlocked `, el("em", "", event.name));
         else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
 
         const avatars = el("span", "feed-avatars");
@@ -889,6 +932,10 @@ function setUpSuggestions() {
             return item;
         }));
     };
+    $("achievementsButton").addEventListener("click", () => {
+        setMenuOpen(false);
+        showAchievements();
+    });
     $("suggestButton").addEventListener("click", async () => {
         setMenuOpen(false);
         message("suggestMessage", "", true);

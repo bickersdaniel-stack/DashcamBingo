@@ -43,6 +43,19 @@
         <p class="email-message error" id="shopMessage" role="status" hidden></p>
 
         <div id="rollSection">
+            <!-- Seven stops for coming back on days in a row; the last pays most -->
+            <section class="board-panel daily-panel">
+                <div class="daily-head">
+                    <div class="pity-words">
+                        <span class="stat-label">Daily reward</span>
+                        <strong class="pity-title" id="dailyTitle"></strong>
+                    </div>
+                    <button class="btn btn-primary" id="dailyButton" type="button"></button>
+                </div>
+                <ol class="daily-steps" id="dailySteps" aria-label="Daily reward stops"></ol>
+                <p class="admin-hint daily-note" id="dailyNote"></p>
+            </section>
+
             <!-- How close the next guaranteed epic is -->
             <section class="board-panel pity-banner">
                 <div class="pity-words">

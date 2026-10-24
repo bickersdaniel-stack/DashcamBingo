@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buyExtra, buySkin, lookOf, wearExtra } from "./shop.js";
+import { buyExtra, buySkin, claimDaily, dailyStatus, lookOf, wearExtra } from "./shop.js";
 
 const card = { id: "c1" };
 
@@ -38,4 +38,23 @@ test("buyExtra puts it straight on an empty slot, and wearExtra only wears what 
     wearExtra(profile, "frame", "hazard-tape");
     wearExtra(profile, "title", null);
     assert.deepEqual(lookOf(profile), { frame: "hazard-tape", title: null, banner: null });
+});
+
+test("claimDaily walks the 7 stops on days in a row, once a day, and starts over after day 7 or a missed day", () => {
+    const profile = { coins: 0 };
+    assert.deepEqual(dailyStatus(profile, "2026-10-01"), { rewards: [10, 15, 20, 25, 30, 40, 100], claimed: false, done: 0 });
+    assert.equal(claimDaily(profile, "2026-10-01").gained, 10);
+    assert.match(claimDaily(profile, "2026-10-01").error, /Come back tomorrow/);
+    const days = ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07"];
+    assert.deepEqual(days.map(day => claimDaily(profile, day).gained), [15, 20, 25, 30, 40, 100], "across a month end too");
+    assert.equal(profile.coins, 240);
+    assert.deepEqual(dailyStatus(profile, "2026-10-07"), { rewards: [10, 15, 20, 25, 30, 40, 100], claimed: true, done: 7 });
+    assert.equal(dailyStatus(profile, "2026-10-08").done, 0, "a full week starts over");
+    claimDaily(profile, "2026-10-08");
+    claimDaily(profile, "2026-10-09");
+    assert.equal(dailyStatus(profile, "2026-10-10").done, 2);
+    assert.equal(dailyStatus(profile, "2026-10-11").done, 0, "a missed day starts over");
+    assert.equal(claimDaily(profile, "2026-10-11").gained, 10);
+    profile.daily = { day: "2026-03-31", step: 3 };
+    assert.equal(dailyStatus(profile, "2026-04-01").done, 3, "the day before works across a month boundary");
 });

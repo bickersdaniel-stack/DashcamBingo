@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { recordProgress } from "./achievements.js";
 import { refreshPlayer } from "./rooms.js";
-import { save, store, touchProfile } from "./store.js";
+import { save, store, sydneyDay, touchProfile } from "./store.js";
 import { json, signedIn } from "./suggestions.js";
 
 export const rollCost = 100;
@@ -189,6 +189,27 @@ export function buySkin(profile, card, styleId) {
     };
 }
 
+// Daily reward: claim once a Sydney day. Days in a row walk the 7 stops, the last paying most, then it starts over;
+// missing a day starts it over too
+export const dailyRewards = [10, 15, 20, 25, 30, 40, 100];
+const dayBefore = day => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10); // Midday, so no DST slip
+
+// How many stops are done in this run, and whether today's is claimed
+export function dailyStatus(profile, today) {
+    const { day = null, step = 0 } = profile.daily ?? {};
+    const claimed = day === today;
+    return { rewards: dailyRewards, claimed, done: claimed ? step : day === dayBefore(today) ? step % dailyRewards.length : 0 };
+}
+
+export function claimDaily(profile, today) {
+    const status = dailyStatus(profile, today);
+    if (status.claimed) return { error: "You've had today's reward. Come back tomorrow." };
+    const step = status.done + 1;
+    profile.daily = { day: today, step };
+    profile.coins = (profile.coins ?? 0) + dailyRewards[step - 1];
+    return { coins: profile.coins, gained: dailyRewards[step - 1], daily: dailyStatus(profile, today) };
+}
+
 export const shop = Router();
 
 shop.get("/api/shop", signedIn, (req, res) => {
@@ -197,8 +218,16 @@ shop.get("/api/shop", signedIn, (req, res) => {
     res.json({
         coins: profile.coins ?? 0, cost: rollCost, refund: duplicateRefund, pity: profile.pity ?? 0, pityAfter, newSkins: profile.newSkins?.length ?? 0,
         rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100), price: r.price })), styles,
-        extras, wearable, freeReactions, owned: profile.extras ?? [], wearing: profile.wearing ?? {}, avatar: req.session.user.avatar
+        extras, wearable, freeReactions, owned: profile.extras ?? [], wearing: profile.wearing ?? {}, avatar: req.session.user.avatar,
+        daily: dailyStatus(profile, sydneyDay())
     });
+});
+
+shop.post("/api/shop/daily", signedIn, (req, res) => {
+    const result = claimDaily(touchProfile(req.session.user), sydneyDay()); // Your name too, in case you've never joined a room
+    if (result.error) return res.status(400).json(result);
+    save();
+    res.json(result);
 });
 
 shop.post("/api/shop/roll", signedIn, (req, res) => {

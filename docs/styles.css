@@ -2511,6 +2511,91 @@ body.in-room .stage {
     color: var(--amber);
     white-space: nowrap;
 }
+/* Daily reward: seven stops joined by a line that fills in as the days go by; the last one pays most */
+.daily-panel {
+    margin: 8px 0 16px;
+    padding: 20px 24px;
+}
+.daily-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+}
+.daily-steps {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin: 20px 0 12px;
+    padding: 0;
+    list-style: none;
+}
+.daily-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+/* The line from the stop before, filled once this one's done */
+.daily-step + .daily-step::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    right: 50%;
+    width: 100%;
+    height: 4px;
+    background-color: var(--surface-3);
+}
+.daily-step.done::before {
+    background-color: var(--stamp);
+}
+.daily-dot {
+    position: relative;
+    z-index: 1; /* Over the lines either side */
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-strong);
+    border-radius: 50%;
+    background-color: var(--surface);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+.daily-step:last-child .daily-dot {
+    border-color: var(--amber);
+}
+.daily-step.done .daily-dot {
+    border-color: var(--stamp);
+    background-color: var(--stamp);
+    color: var(--stamp-text);
+}
+.daily-step.next .daily-dot {
+    border-color: var(--stamp);
+    color: var(--heading);
+    box-shadow: 0 0 0 4px var(--stamp-ambient);
+    animation: daily-ready 1.6s ease-in-out infinite;
+}
+@keyframes daily-ready {
+    50% { box-shadow: 0 0 0 8px var(--stamp-ambient); }
+}
+.daily-coins {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+.daily-step.next .daily-coins {
+    color: var(--heading);
+}
+.daily-step:last-child .daily-coins {
+    color: var(--amber);
+}
+.daily-note {
+    margin: 0;
+}
 /* The card on the left; what's in the crate above the button on the right. Phones stack card, button, details */
 .shop-roll {
     display: grid;

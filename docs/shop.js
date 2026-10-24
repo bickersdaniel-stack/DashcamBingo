@@ -1,5 +1,5 @@
-// Shop page: roll for card skins with coins from playing and watch the card flip (wearing them is on the Cards page),
-// and buy and wear extras
+// Shop page: claim the daily reward, roll for card skins with coins from playing and watch the card flip (wearing them
+// is on the Cards page), and buy and wear extras
 import { fillPlayCard } from "./playcard.js";
 import { coinsText, showNewSkins } from "./nav.js";
 
@@ -9,6 +9,7 @@ let rolling = false;
 const kinds = { frame: "Frames", title: "Titles", banner: "Banners", reactions: "Reaction packs", celebration: "Bingo celebrations", stamp: "Stamps" };
 
 $("rollButton").addEventListener("click", roll);
+$("dailyButton").addEventListener("click", claimDaily);
 
 const loaded = await api("GET", "/api/shop");
 if (!loaded.ok) {
@@ -16,6 +17,7 @@ if (!loaded.ok) {
     $("rollSection").hidden = true;
 } else {
     shop = loaded.data;
+    showDaily();
     $("odds").replaceChildren(...shop.rarities.map(r => {
         const item = el("li", `shop-odd rarity-${r.id}`);
         item.append(el("span", "play-card-gem"), el("span", "", r.name), el("span", "shop-chance", `${r.chance}%`));
@@ -36,6 +38,35 @@ function showCoins() {
     $("pity").textContent = left <= 0 ? "Your next roll is epic or better" : `Epic or better within ${left} roll${left === 1 ? "" : "s"}`;
     $("pityCount").textContent = `${Math.min(shop.pity, shop.pityAfter)} / ${shop.pityAfter}`;
     $("pityBar").style.setProperty("--done", `${Math.min(shop.pity / shop.pityAfter, 1) * 100}%`);
+}
+
+// The 7 stops: the ones done this run ticked and joined up, today's lit until it's claimed
+function showDaily() {
+    const { rewards, done, claimed } = shop.daily;
+    $("dailySteps").replaceChildren(...rewards.map((coins, i) => {
+        const ready = i === done && !claimed;
+        const stop = el("li", `daily-step${i < done ? " done" : ready ? " next" : ""}`);
+        stop.ariaLabel = `Day ${i + 1}: ${coins} coins${i < done ? ", claimed" : ready ? ", ready to claim" : ""}`;
+        stop.append(el("span", "daily-dot", i < done ? "✓" : String(i + 1)), el("span", "daily-coins", `+${coins}`));
+        return stop;
+    }));
+    $("dailyTitle").textContent = !claimed ? `Day ${done + 1} of ${rewards.length} is ready`
+        : done === rewards.length ? "Week done. It starts again tomorrow" : `Day ${done} done. Come back tomorrow`;
+    $("dailyButton").textContent = claimed ? "✓ Claimed" : `Claim ${rewards[done]} 🪙`;
+    $("dailyButton").disabled = claimed;
+    $("dailyNote").textContent = "Claim once a day. Days in a row walk the stops to the big one; miss a day and it starts again.";
+}
+
+async function claimDaily() {
+    $("dailyButton").disabled = true; // No double claims from a double tap
+    const result = await api("POST", "/api/shop/daily");
+    if (!result.ok) {
+        $("dailyButton").disabled = false;
+        return $("dailyNote").textContent = result.data.error;
+    }
+    Object.assign(shop, { coins: result.data.coins, daily: result.data.daily });
+    showDaily();
+    showCoins();
 }
 
 async function roll() {

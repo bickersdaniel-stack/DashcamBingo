@@ -74,7 +74,7 @@ export function removeWin(userId) {
 // Coins: one for each new sighting (capped each day), more for bingos, spent in the shop. Admins can change
 // the numbers; a round's cap counts both on one card, so nobody can farm a round
 export const coinSettings = () => ({ bingoCoins: 25, countCoinsPerDay: 60, coinsPerRound: 100, ...store.settings });
-const sydneyDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+export const sydneyDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 
 // The daily cap on a profile row; gives 1 coin, or 0 once today's are used up
 export function countCoin(row, day, cap = coinSettings().countCoinsPerDay) {

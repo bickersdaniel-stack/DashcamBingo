@@ -175,6 +175,24 @@ button:focus-visible, .custom-colour:focus-within, .path-link:focus-visible {
     text-decoration: none;
     white-space: nowrap;
 }
+/* The solo page's logo, centred in the bar */
+.bar-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--heading);
+    white-space: nowrap;
+    pointer-events: none;
+}
+@media (max-width: 639px) {
+    .bar-title {
+        font-size: 16px;
+    }
+}
 /* The logo: symbol + name, spaced like the lockup in brand/ (gap = one winning square) */
 .wordmark, .bar-title {
     display: inline-flex;

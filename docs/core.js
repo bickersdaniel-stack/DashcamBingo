@@ -143,42 +143,61 @@ function setStampColour(colour) {
     if (colourCode) colourCode.textContent = colour;
 }
 
-// Draws a card from the first 25 phrases (index 12 is the FREE square); onMark runs after each tap.
-// notes are descriptions by the same index, for squares that need one
-export function drawBoard(phrases, onMark, notes = []) {
+// Draws a card from the first 25 phrases (index 12 is the FREE square). Each square counts sightings: a click
+// (or Enter) adds one; a right click (or Backspace, or its minus on touch screens) takes one off. A square is
+// marked from one up, and onCount(index, count, change) runs after each change.
+// notes are descriptions and counts are starting counts, both by the same index
+export function drawBoard(phrases, onCount, notes = [], counts = []) {
     bingoCard.replaceChildren();
 
     for (let i = 0; i < 25; i++) {
-        const cell = document.createElement("button");
-        cell.type = "button";
+        const cell = document.createElement("div");
         cell.classList.add("bingo-cell");
 
         if (i === 12) {
             // FREE is always marked
             cell.classList.add("center-cell", "crossed");
             cell.innerHTML = '<span class="free-word">FREE</span>';
-            cell.disabled = true;
         } else {
-            cell.textContent = phrases[i];
-            cell.setAttribute("aria-pressed", "false");
+            cell.setAttribute("role", "button");
+            cell.tabIndex = 0;
+            const minus = Object.assign(document.createElement("button"), { type: "button", className: "cell-minus", textContent: "−" });
+            minus.setAttribute("aria-label", "Take one off");
+            cell.append(Object.assign(document.createElement("span"), { className: "cell-text", textContent: phrases[i] }), minus);
             if (notes[i]) {
                 cell.classList.add("has-note");
                 cell.dataset.note = notes[i];
                 cell.setAttribute("aria-description", notes[i]);
             }
-            cell.addEventListener("click", () => {
-                setCrossed(cell, !cell.classList.contains("crossed"));
-                onMark(i, cell.classList.contains("crossed"));
+            const change = by => {
+                const count = Math.min(99, Math.max(0, Number(cell.dataset.count) + by));
+                if (count === Number(cell.dataset.count)) return;
+                setCount(cell, count);
+                onCount(i, count, by);
+            };
+            cell.addEventListener("click", event => change(event.target.closest(".cell-minus") ? -1 : 1));
+            cell.addEventListener("contextmenu", event => {
+                event.preventDefault();
+                change(-1);
             });
+            cell.addEventListener("keydown", event => {
+                if (event.target !== cell) return; // The minus button's own Enter arrives as a click
+                if (event.key === "Enter" || event.key === " ") change(1);
+                else if (event.key === "Backspace" || event.key === "Delete" || event.key === "-") change(-1);
+                else return;
+                event.preventDefault();
+            });
+            setCount(cell, counts[i] ?? 0);
         }
 
         bingoCard.appendChild(cell);
     }
 }
 
-export function setCrossed(cell, crossed) {
-    cell.classList.toggle("crossed", crossed);
-    cell.setAttribute("aria-pressed", crossed);
+export function setCount(cell, count) {
+    cell.dataset.count = count;
+    cell.classList.toggle("crossed", count > 0);
+    cell.setAttribute("aria-pressed", count > 0);
 }
 
 export function captureScreenshot() {

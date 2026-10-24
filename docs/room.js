@@ -1,6 +1,6 @@
 // Together mode: sign in (Discord, Google or an email link), then rooms where everyone's marks and wins show up live
 import { io } from "/socket.io/socket.io.esm.min.js";
-import { drawBoard, setCrossed, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
+import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -41,6 +41,7 @@ if (me) {
     document.querySelectorAll(".my-avatar").forEach(img => img.src = me.avatar);
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
     showMyWins(me.wins);
+    showMyCoins(me.coins ?? 0);
     setUpMenu("account", "account");
     setUpSuggestions();
     welcome();
@@ -285,22 +286,24 @@ function showRoom(socket) {
     $("roomCode").textContent = state.code;
     $("roundNumber").textContent = `Round ${state.round.number}`;
 
-    marked = new Set(state.card.marked);
+    marked = new Set(state.card.counts.flatMap((count, index) => count > 0 ? [index] : []));
     bestLines = state.card.bestLines; // A refresh doesn't screenshot a line you already had
     pulses.forEach(clearTimeout);
     pulses.clear();
-    drawBoard(state.card.phrases, (index, crossed) => {
-        if (crossed) {
+    drawBoard(state.card.phrases, (index, count, change) => {
+        if (count > 0) {
             marked.add(index);
             stopPulse(index);
         } else {
             marked.delete(index);
         }
-        socket.emit("card:mark", { round: state.round.id, index, marked: crossed });
+        socket.emit("card:count", { round: state.round.id, index, delta: change }, ({ gained, coins }) => {
+            showMyCoins(coins);
+            if (gained > 0) popCoins($("bingoCard").children[index], gained);
+        });
         checkBingo();
         showReroll();
-    }, state.card.notes);
-    marked.forEach(index => setCrossed($("bingoCard").children[index], true));
+    }, state.card.notes, state.card.counts);
     $("bingoAlert").hidden = countLines(marked) === 0;
     showReroll();
     showRerollLock();
@@ -662,6 +665,17 @@ function showMyWins(n) {
     $("myWins").textContent = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
 }
 
+function showMyCoins(n) {
+    $("myCoins").textContent = n === 1 ? "🪙 1 coin" : `🪙 ${n} coins`;
+}
+
+// "+1" floating up out of the square a coin was earned on
+function popCoins(cell, gained) {
+    const pop = el("span", "coin-pop", `+${gained} 🪙`);
+    cell.append(pop);
+    setTimeout(() => pop.remove(), 900);
+}
+
 function showPlayers() {
     const players = [...state.players].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
     $("playerList").replaceChildren(...players.map(player => {
@@ -932,7 +946,7 @@ function setUpCardTips() {
         tip.hidden = true;
     };
     const showAt = (cell, x, y) => {
-        tip.replaceChildren(el("strong", "", cell.textContent), el("span", "", cell.dataset.note));
+        tip.replaceChildren(el("strong", "", cell.querySelector(".cell-text").textContent), el("span", "", cell.dataset.note));
         tip.hidden = false;
         const { width, height } = tip.getBoundingClientRect();
         tip.style.left = `${Math.min(Math.max(8, x - width / 2), innerWidth - width - 8)}px`;
@@ -981,7 +995,6 @@ function setUpCardTips() {
         swallowClick = false;
         event.stopPropagation();
     }, true);
-    card.addEventListener("contextmenu", event => event.target.closest(".has-note") && event.preventDefault());
     // The next touch anywhere closes it
     document.addEventListener("pointerdown", event => {
         if (event.pointerType === "mouse" || tip.hidden) return;

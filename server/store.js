@@ -68,6 +68,34 @@ export function removeWin(userId) {
     return row.wins;
 }
 
+// Coins: one for each new sighting (at most 60 a day from those), more for bingos, spent in the shop
+export const countCoinsPerDay = 60;
+const sydneyDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+
+// The daily cap on a profile row; gives 1 coin, or 0 once today's 60 are used up
+export function countCoin(row, day) {
+    if (row.coinDay !== day) Object.assign(row, { coinDay: day, coinsToday: 0 });
+    if (row.coinsToday >= countCoinsPerDay) return 0;
+    row.coinsToday++;
+    row.coins = (row.coins ?? 0) + 1;
+    return 1;
+}
+
+export function earnCountCoin(userId) {
+    const gained = countCoin(store.profiles[userId] ??= { wins: 0 }, sydneyDay());
+    if (gained) save();
+    return gained;
+}
+
+export function addCoins(userId, amount) {
+    const row = store.profiles[userId] ??= { wins: 0 };
+    row.coins = Math.max(0, (row.coins ?? 0) + amount);
+    save();
+    return row.coins;
+}
+
+export const coinsOf = userId => store.profiles[userId]?.coins ?? 0;
+
 export function save() {
     mkdirSync(folder, { recursive: true });
     const temporary = new URL("store.json.tmp", folder);

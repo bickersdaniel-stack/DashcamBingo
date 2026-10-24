@@ -1,6 +1,6 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
-import { addWin, cardsIn, countSpot, defaultPacks, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
+import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -11,6 +11,8 @@ const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
+const bingoCoins = 25;
+const maxCount = 99;
 let roomsIo = null; // Kept so changes from the admin page reach rooms in progress
 
 export function setupRooms(io) {
@@ -63,31 +65,37 @@ export function setupRooms(io) {
             socket.to(room.code).emit("player:update", playerInfo(room, player));
         });
 
-        socket.on("card:mark", data => {
+        // One more (or one fewer) sighting on a square; the reply says how many coins that earned
+        socket.on("card:count", (data, reply) => {
             const room = rooms.get(socket.data.code);
-            const { round, index, marked } = data ?? {};
-            if (!room || round !== room.round.id || !Number.isInteger(index) || index < 0 || index > 24 || index === 12 || typeof marked !== "boolean") return;
+            const { round, index, delta } = data ?? {};
+            if (!room || round !== room.round.id || !Number.isInteger(index) || index < 0 || index > 24 || index === 12 || (delta !== 1 && delta !== -1)) return;
             const card = room.round.cards.get(user.id);
             const player = room.players.get(user.id);
-            if (card.marked.has(index) === marked) return;
+            const change = applyCount(card, index, delta);
+            if (!change) return;
 
-            if (marked) {
-                card.marked.add(index);
+            let gained = change.coin ? earnCountCoin(user.id) : 0;
+            if (delta > 0) spot(io, room, player, card.phrases[index]); // Each sighting can show in the feed
+            if (change.marked) {
                 countSpot(card.ids[index], 1);
-                spot(io, room, player, card.phrases[index]);
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
-                    if (card.bestLines === 0) player.wins = addWin(user.id); // One win per round, for the first line; kept on their profile
+                    if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
+                        player.wins = addWin(user.id);
+                        addCoins(user.id, bingoCoins);
+                        gained += bingoCoins;
+                    }
                     card.bestLines = lines;
                     addEvent(io, room, { type: "win", userId: user.id, lines });
                 }
-            } else {
-                card.marked.delete(index);
+            } else if (change.unmarked) {
                 countSpot(card.ids[index], -1);
                 unspot(io, room, player, card.phrases[index]);
                 if (card.bestLines > 0 && countLines(card.marked) === 0) unwin(io, room, player, card);
             }
             io.to(room.code).emit("player:update", playerInfo(room, player));
+            if (typeof reply === "function") reply({ gained, coins: coinsOf(user.id) });
         });
 
         // A new round, with the host's YouTube video if they gave one
@@ -283,8 +291,23 @@ function dealCard(room) {
         ids: picked.map(card => card?.id ?? null),
         phrases: picked.map(card => card?.text ?? "FREE"),
         notes: picked.map(card => card?.description ?? ""),
-        marked: new Set(), bestLines: 0, rerollsUsed: 0
+        counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set(), bestLines: 0, rerollsUsed: 0
     };
+}
+
+// One more or one fewer sighting on a square (never below 0 or above 99). Says what changed: whether the square
+// became marked or unmarked, and whether it's higher than it has been this round, which earns a coin, so
+// taking one off and adding it back earns nothing more
+export function applyCount(card, index, delta) {
+    const before = card.counts[index];
+    const count = Math.min(maxCount, Math.max(0, before + delta));
+    if (count === before) return null;
+    card.counts[index] = count;
+    if (count > 0) card.marked.add(index);
+    else card.marked.delete(index);
+    const coin = count > card.peak[index];
+    if (coin) card.peak[index] = count;
+    return { count, marked: before === 0, unmarked: count === 0, coin };
 }
 
 // A third each from the most spotted, the middle and the least spotted cards, so every card gets a fair mix.
@@ -347,6 +370,7 @@ function unspot(io, room, player, phrase) {
 // Unmarking until no line is left takes back this round's BINGO and the win on their profile
 function unwin(io, room, player, card) {
     player.wins = removeWin(player.id);
+    addCoins(player.id, -bingoCoins);
     card.bestLines = 0;
     for (const event of room.round.events) {
         if (event.type !== "win" || event.userId !== player.id || event.undone) continue;
@@ -386,7 +410,7 @@ function stateFor(room, userId) {
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
-        card: { phrases: card.phrases, notes: card.notes, marked: [...card.marked], bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
+        card: { phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 

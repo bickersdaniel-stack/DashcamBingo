@@ -19,7 +19,8 @@ export const isAdmin = user => !!user && (isOwner(user.id) || store.profiles[use
 auth.get("/api/me", (req, res) => {
     if (req.session.user) return res.json({
         ...req.session.user, admin: isAdmin(req.session.user),
-        wins: store.profiles[req.session.user.id]?.wins ?? 0
+        wins: store.profiles[req.session.user.id]?.wins ?? 0,
+        coins: store.profiles[req.session.user.id]?.coins ?? 0
     });
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up
 });

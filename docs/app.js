@@ -1,5 +1,5 @@
 // Solo game: deals cards in the browser and checks for wins locally
-import { drawBoard, setCrossed, captureScreenshot } from "./core.js";
+import { drawBoard, setCount, captureScreenshot } from "./core.js";
 import { countLines } from "./shared/lines.js";
 
 const bingoCard = document.getElementById("bingoCard");
@@ -15,7 +15,7 @@ document.getElementById("refreshButton").addEventListener("click", () => {
 
 // Unmark everything except FREE, keeping the same card
 document.getElementById("clearButton").addEventListener("click", () => {
-    bingoCard.querySelectorAll(".bingo-cell.crossed:not(.center-cell)").forEach(cell => setCrossed(cell, false));
+    bingoCard.querySelectorAll(".bingo-cell.crossed:not(.center-cell)").forEach(cell => setCount(cell, 0));
     bestLines = 0;
     checkBingo();
 });

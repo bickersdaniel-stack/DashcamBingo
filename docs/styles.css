@@ -395,17 +395,63 @@ button:focus-visible, .custom-colour:focus-within {
     font-weight: 600;
     box-shadow: 0 0 18px var(--stamp-glow);
 }
-/* Little dot in the corner of marked squares */
+.bingo-cell:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+/* How many times a marked square has been seen, in its corner */
 .bingo-cell.crossed:not(.center-cell)::after {
-    content: "";
+    content: attr(data-count);
     position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 7px;
-    height: 7px;
+    top: 4px;
+    right: 4px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background-color: var(--stamp-text);
+    color: var(--stamp);
+    font: 800 10px/15px "Plus Jakarta Sans", system-ui, sans-serif;
+    letter-spacing: 0;
+    text-align: center;
+}
+/* Phones can't right click, so a counted square gets a minus to take one off */
+.cell-minus {
+    display: none;
+    position: absolute;
+    left: 3px;
+    bottom: 3px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
     border-radius: 50%;
     background-color: var(--stamp-text);
-    opacity: 0.85;
+    color: var(--stamp);
+    font: 800 15px/22px system-ui, sans-serif;
+    cursor: pointer;
+}
+@media (hover: none) {
+    .bingo-cell.crossed .cell-minus {
+        display: block;
+    }
+}
+/* A coin earned for a sighting floats up out of the square */
+.coin-pop {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    z-index: 3;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--amber);
+    pointer-events: none;
+    animation: coin-pop 0.9s ease-out forwards;
+}
+@keyframes coin-pop {
+    from { transform: translate(-50%, 0); opacity: 1; }
+    to { transform: translate(-50%, -32px); opacity: 0; }
 }
 .center-cell {
     cursor: default;
@@ -1357,6 +1403,14 @@ body.in-room .stage {
     .bingo-cell {
         border-radius: 8px;
     }
+    .cell-minus {
+        left: 2px;
+        bottom: 2px;
+        width: 17px;
+        height: 17px;
+        font-size: 12px;
+        line-height: 17px;
+    }
 }
 /* The video fills its tile; YouTube and the stream letterbox themselves inside it */
 .video-body {
@@ -1814,23 +1868,9 @@ body.in-room .stage {
     cursor: not-allowed;
 }
 
-/* A square with a description: a small i in the corner, and the description in a tip at the pointer */
+/* A square with a description shows it in a tip at the pointer after a while */
 .bingo-cell.has-note {
     -webkit-touch-callout: none; /* Holding shows the description, not the phone's own menu */
-}
-.bingo-cell.has-note::before {
-    content: "i";
-    position: absolute;
-    right: 5px;
-    bottom: 5px; /* The other corners show the marked dot and who else spotted it */
-    display: grid;
-    place-items: center;
-    width: 11px;
-    height: 11px;
-    border: 1px solid currentColor;
-    border-radius: 50%;
-    font: italic 700 8px/1 Georgia, serif;
-    opacity: 0.55;
 }
 .card-tip {
     position: fixed;

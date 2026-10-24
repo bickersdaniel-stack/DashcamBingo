@@ -45,6 +45,7 @@
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="cardsPanel" id="cardsTab">Cards</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="packsPanel">Packs</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="usersPanel">Users</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="coinsPanel">Coins</button>
         </div>
         <p class="email-message admin-message" id="adminMessage" role="status" hidden></p>
 
@@ -93,6 +94,16 @@
             </div>
             <ul class="item-list" id="userList"></ul>
             <nav class="pager" id="userPager" aria-label="Pages of people" hidden></nav>
+        </section>
+
+        <section class="admin-panel" id="coinsPanel" role="tabpanel" hidden>
+            <p class="admin-hint">Players earn a coin for each new high on a square, up to the daily cap, plus coins for a BINGO. Coins per round caps both together on one card, rerolls included, so nobody can farm a round. Changes count from the next coin earned.</p>
+            <form class="item admin-row" id="coinsForm">
+                <label class="check-label">Coins per bingo <input class="link-input wins-input" id="bingoCoins" type="number" min="0" max="10000" required></label>
+                <label class="check-label">Coins per round <input class="link-input wins-input" id="coinsPerRound" type="number" min="0" max="10000" required></label>
+                <label class="check-label">Count coins per day <input class="link-input wins-input" id="countCoinsPerDay" type="number" min="0" max="10000" required></label>
+                <button class="btn btn-primary" id="coinsSave" type="submit">Save</button>
+            </form>
         </section>
     </main>
 

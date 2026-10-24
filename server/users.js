@@ -1,8 +1,9 @@
-// Admins see everyone who has joined a room, and can make admins, block people, and fix win and coin counts
+// Admins see everyone who has joined a room, and can make admins, block people, fix win and coin counts,
+// and set how many coins players earn
 import { Router } from "express";
 import { isOwner } from "./auth.js";
 import { kickUser, refreshPlayer } from "./rooms.js";
-import { save, store } from "./store.js";
+import { coinSettings, save, store } from "./store.js";
 import { adminOnly, json } from "./suggestions.js";
 
 export const users = Router();
@@ -45,4 +46,21 @@ users.patch("/api/admin/users/:id", adminOnly, json, (req, res) => {
     if (profile.blocked) kickUser(id);
     else refreshPlayer(id);
     res.json({ ok: true });
+});
+
+// What's wrong with new coin numbers, if anything; ones left out stay as they are
+export function settingsProblem(changes) {
+    const bad = Object.values(changes).some(value => value !== undefined && !(Number.isInteger(value) && value >= 0 && value <= 10_000));
+    return bad ? "Coin numbers must be whole numbers from 0 to 10000." : null;
+}
+
+users.get("/api/admin/settings", adminOnly, (req, res) => res.json(coinSettings()));
+
+users.patch("/api/admin/settings", adminOnly, json, (req, res) => {
+    const changes = { bingoCoins: req.body?.bingoCoins, coinsPerRound: req.body?.coinsPerRound, countCoinsPerDay: req.body?.countCoinsPerDay };
+    const problem = settingsProblem(changes);
+    if (problem) return res.status(400).json({ error: problem });
+    for (const [key, value] of Object.entries(changes)) if (value !== undefined) store.settings[key] = value;
+    save();
+    res.json(coinSettings());
 });

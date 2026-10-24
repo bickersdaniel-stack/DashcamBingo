@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { applyCount, coinsLeft, payBingo, refundBingo } from "./rooms.js";
-import { countCoin, store } from "./store.js";
+import { changeCoinSettings, countCoin, db } from "./store.js";
 
 const freshCard = () => ({ counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set() });
 
@@ -40,10 +40,10 @@ test("countCoin stops at the daily cap and starts again the next day", () => {
     assert.equal(row.coinsToday, 60, "the default cap");
 });
 
-// Admin changes to the coin numbers live in store.settings; these only change it in memory
+// Admin changes to the coin numbers live in the settings table; tests run on an in-memory database
 const withSettings = (settings, run) => {
-    store.settings = settings;
-    try { run(); } finally { store.settings = {}; }
+    changeCoinSettings(settings);
+    try { run(); } finally { db.exec("DELETE FROM settings"); }
 };
 
 test("the round cap stops count coins once a card has earned its share", () => withSettings({ coinsPerRound: 10 }, () => {
@@ -51,7 +51,7 @@ test("the round cap stops count coins once a card has earned its share", () => w
     assert.equal(coinsLeft(card), 1);
     card.coinsEarned = 10;
     assert.equal(coinsLeft(card), 0);
-    store.settings.coinsPerRound = 4; // Lowered mid-round
+    changeCoinSettings({ coinsPerRound: 4 }); // Lowered mid-round
     assert.equal(coinsLeft(card), 0);
 }));
 

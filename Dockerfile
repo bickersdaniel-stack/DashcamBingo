@@ -7,4 +7,4 @@ COPY server server
 COPY docs docs
 ENV NODE_ENV=production
 USER node
-CMD ["node", "server/index.js"]
+CMD ["node", "--disable-warning=ExperimentalWarning", "server/index.js"]

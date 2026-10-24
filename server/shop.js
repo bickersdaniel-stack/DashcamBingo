@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 import { Router } from "express";
 import { recordProgress } from "./achievements.js";
 import { refreshPlayer } from "./rooms.js";
-import { save, store, sydneyDay, touchProfile } from "./store.js";
+import { cardTable, getProfile, packTable, sydneyDay, touchProfile, updateProfile } from "./store.js";
 import { json, signedIn } from "./suggestions.js";
 
 export const rollCost = 100;
@@ -213,7 +213,7 @@ export function claimDaily(profile, today) {
 export const shop = Router();
 
 shop.get("/api/shop", signedIn, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ?? {};
+    const profile = getProfile(req.session.user.id) ?? {};
     const total = rarities.reduce((sum, r) => sum + r.weight, 0);
     res.json({
         coins: profile.coins ?? 0, cost: rollCost, refund: duplicateRefund, pity: profile.pity ?? 0, pityAfter, newSkins: profile.newSkins?.length ?? 0,
@@ -224,53 +224,46 @@ shop.get("/api/shop", signedIn, (req, res) => {
 });
 
 shop.post("/api/shop/daily", signedIn, (req, res) => {
-    const result = claimDaily(touchProfile(req.session.user), sydneyDay()); // Your name too, in case you've never joined a room
+    touchProfile(req.session.user); // Your name too, in case you've never joined a room
+    const result = updateProfile(req.session.user.id, profile => claimDaily(profile, sydneyDay()));
     if (result.error) return res.status(400).json(result);
-    save();
     res.json(result);
 });
 
 shop.post("/api/shop/roll", signedIn, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ??= { wins: 0 };
-    const result = buy(profile, store.cards);
+    const result = updateProfile(req.session.user.id, profile => buy(profile, cardTable.all()));
     if (result.error) return res.status(400).json(result);
-    save();
-    result.card.packName = store.packs.find(pack => pack.id === result.card.pack)?.name ?? "";
+    result.card.packName = packTable.get(result.card.pack)?.name ?? "";
     res.json(result);
 });
 
 shop.post("/api/shop/buy", signedIn, json, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ??= { wins: 0 };
-    const result = buySkin(profile, store.cards.find(card => card.id === req.body?.cardId), req.body?.style);
+    const result = updateProfile(req.session.user.id, profile => buySkin(profile, cardTable.get(req.body?.cardId), req.body?.style));
     if (result.error) return res.status(400).json(result);
-    save();
     res.json(result);
 });
 
 shop.post("/api/shop/extras/buy", signedIn, json, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ??= { wins: 0 };
-    const result = buyExtra(profile, req.body?.id);
+    const result = updateProfile(req.session.user.id, profile => buyExtra(profile, req.body?.id));
     if (result.error) return res.status(400).json(result);
-    save();
     refreshPlayer(req.session.user.id); // Rooms you're in show it straight away
     res.json(result);
 });
 
 shop.post("/api/me/wear", signedIn, json, (req, res) => {
-    const result = wearExtra(store.profiles[req.session.user.id] ?? {}, req.body?.kind, req.body?.id ?? null);
+    const result = updateProfile(req.session.user.id, profile => wearExtra(profile, req.body?.kind, req.body?.id ?? null));
     if (result.error) return res.status(400).json(result);
-    save();
     refreshPlayer(req.session.user.id);
     res.json(result);
 });
 
 // Every card, with the skins you own for it, the one you're wearing, and whether it has a skin you haven't seen yet
 shop.get("/api/me/collection", signedIn, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ?? {};
+    const profile = getProfile(req.session.user.id) ?? {};
     const skins = profile.skins ?? {};
     const unseen = new Set(profile.newSkins ?? []);
-    const packNames = new Map(store.packs.map(pack => [pack.id, pack.name]));
-    res.json(store.cards.map(card => ({
+    const packNames = new Map(packTable.all().map(pack => [pack.id, pack.name]));
+    res.json(cardTable.all().map(card => ({
         id: card.id, text: card.text, description: card.description, pack: card.pack, packName: packNames.get(card.pack) ?? "",
         owned: (skins[card.id]?.owned ?? []).map(skinInfo).filter(Boolean), equipped: skins[card.id]?.equipped ?? null,
         new: unseen.has(card.id), showcased: profile.showcase === card.id
@@ -279,30 +272,30 @@ shop.get("/api/me/collection", signedIn, (req, res) => {
 
 // The Cards page has shown your new skins, so the "(+3)" goes
 shop.post("/api/me/skins/seen", signedIn, (req, res) => {
-    const profile = store.profiles[req.session.user.id];
-    if (profile?.newSkins?.length) {
-        profile.newSkins = [];
-        save();
-    }
+    if (getProfile(req.session.user.id)?.newSkins?.length) updateProfile(req.session.user.id, profile => { profile.newSkins = []; });
     res.json({ ok: true });
 });
 
 // Wear one of your skins on a card, or none (style: null)
 shop.post("/api/me/skins/equip", signedIn, json, (req, res) => {
-    const entry = store.profiles[req.session.user.id]?.skins?.[String(req.body?.cardId)];
+    const cardId = String(req.body?.cardId);
     const style = req.body?.style ?? null;
-    if (!entry) return res.status(400).json({ error: "You don't have skins for that card yet." });
-    if (style !== null && !entry.owned.includes(style)) return res.status(400).json({ error: "You don't own that skin." });
-    entry.equipped = style;
-    save();
-    res.json({ ok: true });
+    const result = updateProfile(req.session.user.id, profile => {
+        const entry = Object.hasOwn(profile.skins ?? {}, cardId) ? profile.skins[cardId] : null; // Not "__proto__" and friends
+        if (!entry) return { error: "You don't have skins for that card yet." };
+        if (style !== null && !entry.owned.includes(style)) return { error: "You don't own that skin." };
+        entry.equipped = style;
+        return { ok: true };
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
 });
 
 // Show one card on your profile, in whatever skin it's wearing, or none (cardId: null)
 shop.post("/api/me/showcase", signedIn, json, (req, res) => {
     const cardId = req.body?.cardId ?? null;
-    if (cardId !== null && !store.cards.some(card => card.id === cardId)) return res.status(400).json({ error: "That card doesn't exist." });
-    touchProfile(req.session.user).showcase = cardId; // Your name and picture too, in case you've never joined a room
-    save();
+    if (cardId !== null && cardTable.get(cardId)?.id !== cardId) return res.status(400).json({ error: "That card doesn't exist." });
+    touchProfile(req.session.user); // Your name and picture too, in case you've never joined a room
+    updateProfile(req.session.user.id, profile => { profile.showcase = cardId; });
     res.json({ ok: true });
 });

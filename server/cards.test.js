@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { packsFrom, pickCards } from "./rooms.js";
 import { cardStatsProblem } from "./cards.js";
-import { migrate, store } from "./store.js";
+import { cardTable, migrate, packTable } from "./store.js";
 import { tidyLines } from "./suggestions.js";
 
 const card = (n, pack = "core", dealt = 0, spotted = 0) => ({ id: `c${n}`, text: `Card ${n}`, description: "", pack, dealt, spotted });
@@ -46,14 +46,18 @@ test("pickCards deals 24 different cards, 8 from each third by how often they're
 });
 
 test("packsFrom keeps real packs with enough cards for a whole card", () => {
-    const saved = { packs: store.packs, cards: store.cards };
-    store.packs = [{ id: "a", on: true }, { id: "b", on: false }];
-    store.cards = [...Array.from({ length: 20 }, (_, i) => card(i, "a")), ...Array.from({ length: 10 }, (_, i) => card(20 + i, "b"))];
+    const cards = [...Array.from({ length: 20 }, (_, i) => card(i, "a")), ...Array.from({ length: 10 }, (_, i) => card(20 + i, "b"))];
+    packTable.put("a", { id: "a", on: true });
+    packTable.put("b", { id: "b", on: false });
+    for (const c of cards) cardTable.put(c.id, c);
     try {
         assert.deepEqual(packsFrom(["a", "b", "a", "nope"]), ["a", "b"]);
         assert.equal(packsFrom(["a"]), null); // Only 20 cards
         assert.equal(packsFrom("a"), null);
-    } finally {
-        Object.assign(store, saved); // In memory only; nothing here saves
+        assert.equal(packsFrom([{ id: "a" }, 1]), null, "only pack ids");
+    } finally { // An in-memory database, but tidy anyway
+        for (const c of cards) cardTable.remove(c.id);
+        packTable.remove("a");
+        packTable.remove("b");
     }
 });

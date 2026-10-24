@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { achievements } from "./achievements.js";
 import { lookOf, skinInfo } from "./shop.js";
-import { store } from "./store.js";
+import { allProfiles, cardTable, packTable } from "./store.js";
 import { signedIn } from "./suggestions.js";
 
 export const leaderboard = Router();
@@ -57,17 +57,17 @@ export function profileOf(id, profiles, cards, packs) {
 }
 
 leaderboard.get("/api/players/:id", signedIn, (req, res) => {
-    const profile = profileOf(req.params.id, store.profiles, store.cards, store.packs);
+    const profile = profileOf(req.params.id, allProfiles(), cardTable.all(), packTable.all());
     if (!profile) return res.status(404).json({ error: "There's no profile to show yet." });
     res.json({ ...profile, mine: req.params.id === req.session.user.id }); // Yours gets a way to change your look
 });
 
 leaderboard.get("/api/leaderboard", signedIn, (req, res) => {
-    const players = rankPlayers(store.profiles);
+    const players = rankPlayers(allProfiles());
     res.json({
         players: players.slice(0, 50),
         total: players.length,
         me: players.find(player => player.id === req.session.user.id) ?? null,
-        cards: rankCards(store.cards, store.packs)
+        cards: rankCards(cardTable.all(), packTable.all())
     });
 });

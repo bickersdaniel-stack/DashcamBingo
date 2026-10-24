@@ -2,7 +2,7 @@
 // are kept; access tokens are thrown away and email addresses are never shown to other players.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
-import { store, touchProfile } from "./store.js";
+import { getProfile, touchProfile } from "./store.js";
 
 const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, PUBLIC_URL, SESSION_SECRET } = process.env;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Dashcam Bingo <bingo@dkb.lol>";
@@ -14,17 +14,17 @@ const linkMinutes = 15;
 export const auth = Router();
 // Owners (ADMIN_IDS in .env) are always admins; other admins are set on the admin page
 export const isOwner = id => adminIds.includes(id);
-export const isAdmin = user => !!user && (isOwner(user.id) || store.profiles[user.id]?.admin === true);
+export const isAdmin = user => !!user && (isOwner(user.id) || getProfile(user.id)?.admin === true);
 
 auth.get("/api/me", (req, res) => {
     if (req.session.user) {
         // Signed in but never joined a room: still show them on the admin people list
-        if (!store.profiles[req.session.user.id]) touchProfile(req.session.user);
+        const profile = getProfile(req.session.user.id) ?? touchProfile(req.session.user);
         return res.json({
             ...req.session.user, admin: isAdmin(req.session.user),
-            wins: store.profiles[req.session.user.id]?.wins ?? 0,
-            coins: store.profiles[req.session.user.id]?.coins ?? 0,
-            newSkins: store.profiles[req.session.user.id]?.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
+            wins: profile.wins ?? 0,
+            coins: profile.coins ?? 0,
+            newSkins: profile.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
         });
     }
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up

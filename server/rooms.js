@@ -2,7 +2,7 @@
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
 import { lookOf, reactionsOf, skinInfo, wornExtra } from "./shop.js";
-import { addCoins, addWin, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
+import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, packTable, removeWin, touchProfile, updateProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -89,7 +89,7 @@ export function setupRooms(io) {
                 if (lines > card.bestLines) {
                     const win = { type: "win", userId: user.id, lines };
                     if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
-                        const { id, pieces } = wornExtra(store.profiles[user.id] ?? {}, "celebration") ?? {};
+                        const { id, pieces } = wornExtra(getProfile(user.id) ?? {}, "celebration") ?? {};
                         if (id) win.celebration = { id, pieces };
                         player.wins = addWin(user.id);
                         const paid = payBingo(card);
@@ -120,7 +120,7 @@ export function setupRooms(io) {
             if (!player || Date.now() - (player.lastReactAt ?? 0) < reactGapMs) return;
             player.lastReactAt = Date.now();
             const event = room.round.events.find(e => e.id === data?.eventId);
-            if (react(event, user.id, data?.emoji, reactionsOf(store.profiles[user.id] ?? {}))) {
+            if (react(event, user.id, data?.emoji, reactionsOf(getProfile(user.id) ?? {}))) {
                 io.to(room.code).emit("event:reactions", { id: event.id, reactions: event.reactions });
             }
         });
@@ -298,7 +298,7 @@ export function refreshPlayer(userId) {
     for (const room of rooms.values()) {
         const player = room.players.get(userId);
         if (!player) continue;
-        player.wins = store.profiles[userId]?.wins ?? player.wins;
+        player.wins = getProfile(userId)?.wins ?? player.wins;
         roomsIo.to(room.code).emit("player:update", playerInfo(room, player));
     }
 }
@@ -315,9 +315,8 @@ function startRound(room, video = null, replace = false) {
 // mid-round doesn't change squares people are looking at; each card counts as dealt for the stats
 function dealCard(room) {
     const deck = cardsIn(room.packs);
-    const picked = pickCards(deck.length >= 24 ? deck : store.cards); // A pack was emptied or deleted mid-room
-    for (const card of picked) card.dealt++;
-    save();
+    const picked = pickCards(deck.length >= 24 ? deck : cardTable.all()); // A pack was emptied or deleted mid-room
+    markDealt(picked.map(card => card.id));
     picked.splice(12, 0, null);
     return {
         ids: picked.map(card => card?.id ?? null),
@@ -382,7 +381,7 @@ function shuffle(list, random = Math.random) {
 // The packs a host picked, if they exist and hold enough cards to fill a card
 export function packsFrom(value) {
     if (!Array.isArray(value)) return null;
-    const ids = [...new Set(value)].filter(id => store.packs.some(pack => pack.id === id));
+    const ids = [...new Set(value)].filter(id => typeof id === "string" && packTable.get(id));
     return cardsIn(ids).length >= 24 ? ids : null;
 }
 
@@ -430,14 +429,12 @@ export function react(event, userId, emoji, allowed) {
 
 // Adds to someone's lifetime stats, and tells them (with a pop-up) and the room (in the feed) about anything that unlocks
 function progress(io, room, userId, changes, moment) {
-    const profile = store.profiles[userId] ??= { wins: 0 };
-    const earned = recordProgress(profile, changes, moment);
-    save();
+    const { earned, coins } = updateProfile(userId, profile => ({ earned: recordProgress(profile, changes, moment), coins: profile.coins }));
     for (const a of earned) {
         addEvent(io, room, { type: "achievement", userId, name: a.name });
         for (const other of io.sockets.sockets.values()) {
             if (other.data.userId === userId && other.data.code === room.code) {
-                other.emit("achievement", { name: a.name, description: a.description, coins: a.coins, total: profile.coins });
+                other.emit("achievement", { name: a.name, description: a.description, coins: a.coins, total: coins });
             }
         }
     }
@@ -477,7 +474,7 @@ function addEvent(io, room, event) {
 function playerInfo(room, player) {
     const card = room.round.cards.get(player.id);
     return {
-        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, ...lookOf(store.profiles[player.id] ?? {}),
+        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, ...lookOf(getProfile(player.id) ?? {}),
         connected: room.connections.get(player.id) > 0,
         marked: card ? card.marked.size : 0,
         oneAway: card ? isOneAway(card.marked) : false
@@ -487,7 +484,7 @@ function playerInfo(room, player) {
 // Everything one player needs, including their own card (nobody else's)
 function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
-    const profile = store.profiles[userId] ?? {};
+    const profile = getProfile(userId) ?? {};
     return {
         code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0, packs: room.packs,
         reactions: reactionsOf(profile), stamp: wornExtra(profile, "stamp")?.id ?? null, // Only you see your stamp
@@ -497,7 +494,7 @@ function stateFor(room, userId) {
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
         // skins: your own equipped skin on each square (nobody else sees them)
-        card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(store.profiles[userId]?.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
+        card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(profile.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 

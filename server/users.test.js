@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 process.env.ADMIN_IDS = "owner"; // Read when auth.js loads, so set before importing
-const { store } = await import("./store.js");
+const { cardTable, suggestionTable } = await import("./store.js");
 const { userChangeProblem, listAdminUsers } = await import("./users.js");
 
 test("userChangeProblem keeps owners as admins and stops people locking themselves out", () => {
@@ -27,15 +27,15 @@ test("userChangeProblem keeps owners as admins and stops people locking themselv
 });
 
 test("listAdminUsers includes people who only left a name on a suggestion or card", () => {
-    store.suggestions.push({ by: { id: "only-suggested", name: "Pat" }, status: "pending" });
-    store.cards.push({ by: { id: "only-card", name: "Kim" } });
+    suggestionTable.put("s-test", { id: "s-test", by: { id: "only-suggested", name: "Pat" }, status: "pending" });
+    cardTable.put("c-test", { id: "c-test", by: { id: "only-card", name: "Kim" } });
     try {
         const ids = listAdminUsers().map(user => user.id);
         assert.ok(ids.includes("only-suggested"));
         assert.ok(ids.includes("only-card"));
         assert.equal(listAdminUsers().find(user => user.id === "only-suggested").suggested, 1);
     } finally {
-        store.suggestions.pop();
-        store.cards.pop();
+        suggestionTable.remove("s-test");
+        cardTable.remove("c-test");
     }
 });

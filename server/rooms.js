@@ -2,7 +2,7 @@
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
 import { skinInfo } from "./shop.js";
-import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
+import { addCoins, addWin, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -13,7 +13,6 @@ const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
-const bingoCoins = 25;
 const maxCount = 99;
 let roomsIo = null; // Kept so changes from the admin page reach rooms in progress
 
@@ -77,7 +76,8 @@ export function setupRooms(io) {
             const change = applyCount(card, index, delta);
             if (!change) return;
 
-            let gained = change.coin ? earnCountCoin(user.id) : 0;
+            let gained = change.coin && coinsLeft(card) > 0 ? earnCountCoin(user.id) : 0;
+            card.coinsEarned += gained;
             const phrase = card.phrases[index];
             countSpot(card.ids[index], change.marked ? 1 : change.unmarked ? -1 : 0, delta);
             const first = delta > 0 && spot(io, room, player, phrase); // Each sighting can show in the feed
@@ -87,8 +87,9 @@ export function setupRooms(io) {
                 if (lines > card.bestLines) {
                     if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
                         player.wins = addWin(user.id);
-                        addCoins(user.id, bingoCoins);
-                        gained += bingoCoins;
+                        const paid = payBingo(card);
+                        addCoins(user.id, paid);
+                        gained += paid;
                         moment.bingoMs = Date.now() - room.round.startedAt;
                     }
                     card.bestLines = lines;
@@ -145,7 +146,7 @@ export function setupRooms(io) {
             const room = rooms.get(socket.data.code);
             const card = room?.round.cards.get(user.id);
             if (!room || data?.round !== room.round.id || !canReroll(room, card)) return;
-            room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1 }));
+            room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1, coinsEarned: card.coinsEarned }));
             progress(io, room, user.id, { rerolls: 1 });
             socket.emit("room:state", stateFor(room, user.id));
             io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
@@ -305,8 +306,26 @@ function dealCard(room) {
         ids: picked.map(card => card?.id ?? null),
         phrases: picked.map(card => card?.text ?? "FREE"),
         notes: picked.map(card => card?.description ?? ""),
-        counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set(), bestLines: 0, rerollsUsed: 0
+        counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set(), bestLines: 0, rerollsUsed: 0,
+        coinsEarned: 0, bingoPaid: 0
     };
+}
+
+// What a card can still earn this round; 0, not less, if an admin lowered the cap mid-round
+export const coinsLeft = card => Math.max(0, coinSettings().coinsPerRound - card.coinsEarned);
+
+// A BINGO pays what fits under the round's cap, kept so unwinning takes back exactly that
+export function payBingo(card) {
+    card.bingoPaid = Math.min(coinSettings().bingoCoins, coinsLeft(card));
+    card.coinsEarned += card.bingoPaid;
+    return card.bingoPaid;
+}
+
+export function refundBingo(card) {
+    const paid = card.bingoPaid;
+    card.coinsEarned -= paid;
+    card.bingoPaid = 0;
+    return paid;
 }
 
 // One more or one fewer sighting on a square (never below 0 or above 99). Says what changed: whether the square
@@ -402,7 +421,7 @@ function unspot(io, room, player, phrase) {
 // Unmarking until no line is left takes back this round's BINGO and the win on their profile
 function unwin(io, room, player, card) {
     player.wins = removeWin(player.id);
-    addCoins(player.id, -bingoCoins);
+    addCoins(player.id, -refundBingo(card));
     card.bestLines = 0;
     for (const event of room.round.events) {
         if (event.type !== "win" || event.userId !== player.id || event.undone) continue;

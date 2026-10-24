@@ -13,6 +13,7 @@ try {
     if (error.code !== "ENOENT") throw error; // A broken file should stop the server, not be quietly replaced
 }
 store.profiles ??= {};
+store.settings ??= {}; // Only what an admin changed; coinSettings fills in the rest
 const base = readFileSync(new URL("../docs/phrases.txt", import.meta.url), "utf8")
     .split("\n").map(line => line.trim()).filter(line => line !== "");
 migrate(store, base);
@@ -70,14 +71,15 @@ export function removeWin(userId) {
     return row.wins;
 }
 
-// Coins: one for each new sighting (at most 60 a day from those), more for bingos, spent in the shop
-export const countCoinsPerDay = 60;
+// Coins: one for each new sighting (capped each day), more for bingos, spent in the shop. Admins can change
+// the numbers; a round's cap counts both on one card, so nobody can farm a round
+export const coinSettings = () => ({ bingoCoins: 25, countCoinsPerDay: 60, coinsPerRound: 100, ...store.settings });
 const sydneyDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 
-// The daily cap on a profile row; gives 1 coin, or 0 once today's 60 are used up
-export function countCoin(row, day) {
+// The daily cap on a profile row; gives 1 coin, or 0 once today's are used up
+export function countCoin(row, day, cap = coinSettings().countCoinsPerDay) {
     if (row.coinDay !== day) Object.assign(row, { coinDay: day, coinsToday: 0 });
-    if (row.coinsToday >= countCoinsPerDay) return 0;
+    if (row.coinsToday >= cap) return 0;
     row.coinsToday++;
     row.coins = (row.coins ?? 0) + 1;
     return 1;

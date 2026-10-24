@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyCount } from "./rooms.js";
-import { countCoin, countCoinsPerDay } from "./store.js";
+import { applyCount, coinsLeft, payBingo, refundBingo } from "./rooms.js";
+import { countCoin, store } from "./store.js";
 
 const freshCard = () => ({ counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set() });
 
@@ -31,11 +31,44 @@ test("applyCount only pays a coin for a new high, so taking one off and adding i
 test("countCoin stops at the daily cap and starts again the next day", () => {
     const row = { wins: 0 };
     let total = 0;
-    for (let i = 0; i < countCoinsPerDay + 10; i++) total += countCoin(row, "2026-10-24");
-    assert.equal(total, countCoinsPerDay);
-    assert.equal(row.coins, countCoinsPerDay);
-    assert.equal(countCoin(row, "2026-10-25"), 1);
+    for (let i = 0; i < 15; i++) total += countCoin(row, "2026-10-24", 5);
+    assert.equal(total, 5);
+    assert.equal(row.coins, 5);
+    assert.equal(countCoin(row, "2026-10-25", 5), 1);
     assert.equal(row.coinsToday, 1);
+    for (let i = 0; i < 70; i++) countCoin(row, "2026-10-26");
+    assert.equal(row.coinsToday, 60, "the default cap");
+});
+
+// Admin changes to the coin numbers live in store.settings; these only change it in memory
+const withSettings = (settings, run) => {
+    store.settings = settings;
+    try { run(); } finally { store.settings = {}; }
+};
+
+test("the round cap stops count coins once a card has earned its share", () => withSettings({ coinsPerRound: 10 }, () => {
+    const card = { coinsEarned: 9 };
+    assert.equal(coinsLeft(card), 1);
+    card.coinsEarned = 10;
+    assert.equal(coinsLeft(card), 0);
+    store.settings.coinsPerRound = 4; // Lowered mid-round
+    assert.equal(coinsLeft(card), 0);
+}));
+
+test("a BINGO over the round cap pays only what's left, and unwinning takes back exactly that", () => withSettings({ coinsPerRound: 100, bingoCoins: 25 }, () => {
+    const card = { coinsEarned: 90, bingoPaid: 0 };
+    assert.equal(payBingo(card), 10);
+    assert.equal(card.coinsEarned, 100);
+    assert.equal(refundBingo(card), 10);
+    assert.deepEqual(card, { coinsEarned: 90, bingoPaid: 0 });
+    card.coinsEarned = 0;
+    assert.equal(payBingo(card), 25, "the full amount with room to spare");
+}));
+
+test("settingsProblem takes whole numbers from 0 to 10000 and rejects the rest", async () => {
+    const { settingsProblem } = await import("./users.js");
+    assert.equal(settingsProblem({ bingoCoins: 0, coinsPerRound: 10_000, countCoinsPerDay: undefined }), null);
+    for (const junk of [-1, 1.5, "10", 10_001, null, NaN, true]) assert.match(settingsProblem({ bingoCoins: junk }), /whole numbers/, String(junk));
 });
 
 test("rankPlayers lists winners most first, shares places on a tie, and leaves out the blocked and winless", async () => {

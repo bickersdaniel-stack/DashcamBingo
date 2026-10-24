@@ -1,7 +1,9 @@
-// Admin page: review suggested squares, edit every card and its description, sort cards into packs, and manage people
+// Admin page: review suggested squares, edit every card and its description, sort cards into packs, manage people,
+// and set how many coins players earn
 const $ = id => document.getElementById(id);
 const pageSize = 25;
 const pages = { card: 1, user: 1 }; // The page each long list is on
+const coinKeys = ["bingoCoins", "coinsPerRound", "countCoinsPerDay"]; // Also the ids of their inputs
 let packs = [];
 let cards = [];
 let users = [];
@@ -33,8 +35,17 @@ $("newPackForm").addEventListener("submit", async event => {
     load();
 });
 
+showSaveWhenEdited($("coinsForm"), $("coinsSave"));
+$("coinsForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = await api("PATCH", "/api/admin/settings", Object.fromEntries(coinKeys.map(key => [key, $(key).valueAsNumber])));
+    if (done(result, "Saved.")) load();
+});
+
 async function load() {
-    const [all, waiting, people] = await Promise.all([api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users")]);
+    const [all, waiting, people, settings] = await Promise.all([
+        api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users"), api("GET", "/api/admin/settings")
+    ]);
     if (!all.ok) return message(all.data.error, false);
     ({ packs, cards } = all.data);
     users = people.data;
@@ -46,6 +57,7 @@ async function load() {
     showCards();
     showPacks();
     showUsers();
+    showCoins(settings.data);
     return waiting.data.pending?.length ?? 0;
 }
 
@@ -185,6 +197,11 @@ function showUsers() {
         }
         return item;
     }));
+}
+
+function showCoins(settings) {
+    for (const key of coinKeys) $(key).value = settings[key];
+    $("coinsSave").style.visibility = "hidden"; // Until one is edited again
 }
 
 // One page of a long list; the page stays in range when the list gets shorter

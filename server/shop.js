@@ -35,8 +35,10 @@ export const styles = [
 ];
 const isTopShelf = rarity => rarity === "epic" || rarity === "legendary";
 
-// Everything else the shop sells, bought once and worn in its slot (kind). Frames and banners are drawn in
-// styles.css (.frame-<id>, .banner-<id>); a title is its name under yours. Ids are unique across every kind
+// Everything else the shop sells, bought once and worn in its slot (kind). Frames, banners and stamps are drawn in
+// styles.css (.frame-<id>, .banner-<id>, .stamp-<id>); a title is its name under yours. Reaction packs are just owned:
+// their emojis join the free ones. A celebration's pieces rain (or burst) over the room when you get bingo.
+// Ids are unique across every kind
 export const extras = [
     { id: "gold-ring", kind: "frame", name: "Gold ring", price: 300 },
     { id: "hazard-tape", kind: "frame", name: "Hazard tape", price: 250 },
@@ -51,15 +53,32 @@ export const extras = [
     { id: "outback-dusk", kind: "banner", name: "Outback dusk", price: 300 },
     { id: "coastal-road", kind: "banner", name: "Coastal road", price: 300 },
     { id: "fresh-bitumen", kind: "banner", name: "Fresh bitumen", price: 400 },
-    { id: "night-drive", kind: "banner", name: "Night drive", price: 600 }
+    { id: "night-drive", kind: "banner", name: "Night drive", price: 600 },
+    { id: "aussie-pack", kind: "reactions", name: "Aussie pack", emojis: ["🦘", "🐨", "🍺", "🔥"], price: 200 },
+    { id: "road-rage-pack", kind: "reactions", name: "Road rage pack", emojis: ["😡", "🤬", "🚨", "💥"], price: 200 },
+    { id: "facepalm-pack", kind: "reactions", name: "Facepalm pack", emojis: ["🤦", "🙈", "💀", "🫠"], price: 250 },
+    { id: "confetti", kind: "celebration", name: "Confetti", icon: "🎊", pieces: [""], price: 300 },
+    { id: "fender-bender", kind: "celebration", name: "Fender bender", icon: "🚗💥", pieces: ["🚗", "💥", "🚙", "🛻"], price: 400 },
+    { id: "fireworks", kind: "celebration", name: "Fireworks", icon: "🎆", pieces: ["✨", "🎆", "🎇"], price: 500 },
+    { id: "roo-stampede", kind: "celebration", name: "Roo stampede", icon: "🦘", pieces: ["🦘"], price: 600 },
+    { id: "big-tick", kind: "stamp", name: "Big tick", price: 200 },
+    { id: "star", kind: "stamp", name: "Star", price: 250 },
+    { id: "roo-prints", kind: "stamp", name: "Roo prints", price: 300 },
+    { id: "paint-splat", kind: "stamp", name: "Paint splat", price: 400 }
 ];
-export const wearable = ["frame", "title", "banner"];
+export const wearable = ["frame", "title", "banner", "celebration", "stamp"];
+export const freeReactions = ["👍", "😂", "😮"];
+
+// The extra someone has on in a slot, or undefined
+export const wornExtra = (profile, kind) => extras.find(e => e.kind === kind && e.id === profile.wearing?.[kind]);
 
 // How someone looks to everyone else: their frame and banner ids, and their title's words
 export function lookOf(profile) {
-    const worn = kind => extras.find(e => e.kind === kind && e.id === profile.wearing?.[kind]);
-    return { frame: worn("frame")?.id ?? null, title: worn("title")?.name ?? null, banner: worn("banner")?.id ?? null };
+    return { frame: wornExtra(profile, "frame")?.id ?? null, title: wornExtra(profile, "title")?.name ?? null, banner: wornExtra(profile, "banner")?.id ?? null };
 }
+
+// The emojis someone can react with: the free ones and every pack they own
+export const reactionsOf = profile => [...freeReactions, ...extras.filter(e => e.kind === "reactions" && profile.extras?.includes(e.id)).flatMap(e => e.emojis)];
 
 // Buys an extra, which goes straight on if nothing's in its slot. Returns what you have now, or { error }
 export function buyExtra(profile, id) {
@@ -150,7 +169,7 @@ shop.get("/api/shop", signedIn, (req, res) => {
     res.json({
         coins: profile.coins ?? 0, cost: rollCost, refund: duplicateRefund, pity: profile.pity ?? 0, pityAfter, newSkins: profile.newSkins?.length ?? 0,
         rarities: rarities.map(r => ({ id: r.id, name: r.name, chance: Math.round(r.weight / total * 100), price: r.price })), styles,
-        extras, owned: profile.extras ?? [], wearing: profile.wearing ?? {}, avatar: req.session.user.avatar
+        extras, wearable, freeReactions, owned: profile.extras ?? [], wearing: profile.wearing ?? {}, avatar: req.session.user.avatar
     });
 });
 

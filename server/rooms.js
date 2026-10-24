@@ -1,13 +1,15 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
-import { lookOf, skinInfo } from "./shop.js";
+import { lookOf, reactionsOf, skinInfo, wornExtra } from "./shop.js";
 import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
 const spotMergeMs = 30 * 1000;
 const spotGapMs = 1000;
+const reactGapMs = 300;
+const maxReactions = 8; // Different emojis on one feed item
 const emptyRoomMs = 6 * 60 * 60 * 1000;
 const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
@@ -85,14 +87,17 @@ export function setupRooms(io) {
             if (change.marked) {
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
+                    const win = { type: "win", userId: user.id, lines };
                     if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
+                        const { id, pieces } = wornExtra(store.profiles[user.id] ?? {}, "celebration") ?? {};
+                        if (id) win.celebration = { id, pieces };
                         player.wins = addWin(user.id);
                         addCoins(user.id, bingoCoins);
                         gained += bingoCoins;
                         moment.bingoMs = Date.now() - room.round.startedAt;
                     }
                     card.bestLines = lines;
-                    addEvent(io, room, { type: "win", userId: user.id, lines });
+                    addEvent(io, room, win);
                 }
             } else if (change.unmarked) {
                 unspot(io, room, player, card.phrases[index]);
@@ -105,6 +110,18 @@ export function setupRooms(io) {
             }, moment);
             io.to(room.code).emit("player:update", playerInfo(room, player));
             if (typeof reply === "function") reply({ gained, coins: coinsOf(user.id) });
+        });
+
+        // An emoji on a feed item, or taking yours back off. Sent on its own so it doesn't look like a new sighting
+        socket.on("event:react", data => {
+            const room = rooms.get(socket.data.code);
+            const player = room?.players.get(user.id);
+            if (!player || Date.now() - (player.lastReactAt ?? 0) < reactGapMs) return;
+            player.lastReactAt = Date.now();
+            const event = room.round.events.find(e => e.id === data?.eventId);
+            if (react(event, user.id, data?.emoji, reactionsOf(store.profiles[user.id] ?? {}))) {
+                io.to(room.code).emit("event:reactions", { id: event.id, reactions: event.reactions });
+            }
         });
 
         // A new round, with the host's YouTube video if they gave one
@@ -376,6 +393,22 @@ function spot(io, room, player, phrase) {
     io.to(room.code).emit("event", recent);
 }
 
+// Puts someone's emoji on a feed item (a spot, win or achievement), or takes it off if it's there. Returns whether
+// anything changed
+export function react(event, userId, emoji, allowed) {
+    if (!["spot", "win", "achievement"].includes(event?.type) || !allowed.includes(emoji)) return false;
+    const reactions = event.reactions ??= {};
+    const who = reactions[emoji] ?? [];
+    if (who.includes(userId)) {
+        if (who.length === 1) delete reactions[emoji];
+        else reactions[emoji] = who.filter(id => id !== userId);
+    } else {
+        if (!who.length && Object.keys(reactions).length >= maxReactions) return false;
+        reactions[emoji] = [...who, userId];
+    }
+    return true;
+}
+
 // Adds to someone's lifetime stats, and tells them (with a pop-up) and the room (in the feed) about anything that unlocks
 function progress(io, room, userId, changes, moment) {
     const profile = store.profiles[userId] ??= { wins: 0 };
@@ -435,8 +468,10 @@ function playerInfo(room, player) {
 // Everything one player needs, including their own card (nobody else's)
 function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
+    const profile = store.profiles[userId] ?? {};
     return {
         code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0, packs: room.packs,
+        reactions: reactionsOf(profile), stamp: wornExtra(profile, "stamp")?.id ?? null, // Only you see your stamp
         round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
         streamFrom: room.streamSocket,

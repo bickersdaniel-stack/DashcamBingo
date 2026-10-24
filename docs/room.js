@@ -40,6 +40,8 @@ const viewers = new Map(); // Host: viewer's socket id -> their connection
 let watchPeer = null;      // Viewer: the connection to the host
 let watchingFrom = null;   // Viewer: the host's socket id
 const departed = new Map(); // People who left the room, so their old feed items keep their names
+let sendReaction = null;    // Puts my emoji on a feed item, or takes it off
+let pickingFor = null;      // The feed item whose emoji picker is open
 // Host quality: YouTube + capture stay at this size; the iframe is CSS-scaled to the frame
 const qualities = {
     auto: { width: 1280, height: 720, yt: "default" },
@@ -161,6 +163,7 @@ function showLobby() {
 
 function joinRoom() {
     const socket = connect();
+    sendReaction = (eventId, emoji) => socket.emit("event:react", { eventId, emoji });
 
     // Also runs after a dropped connection comes back, which sends the whole room again
     socket.on("connect", () => socket.emit("room:join", { code }, ({ error }) => {
@@ -220,6 +223,13 @@ function joinRoom() {
         showFeed();
         if (event.type === "spot" && !(event.cleared ?? []).length) pulse(event);
         if (event.type === "win") showMiniBoard(); // A bingo (or one taken back) changes the wins
+        if (i === -1 && event.celebration) celebrate(event.celebration);
+    });
+    socket.on("event:reactions", ({ id, reactions }) => {
+        const event = state?.events.find(e => e.id === id);
+        if (!event) return;
+        event.reactions = reactions;
+        showFeed();
     });
     socket.on("video:update", video => {
         if (!state) return;
@@ -347,6 +357,8 @@ function showRoom(socket) {
         showReroll();
     }, state.card.notes, state.card.counts);
     [...$("bingoCard").children].forEach((cell, i) => wearSkin(cell, state.card.skins?.[i])); // Only you see your skins
+    $("bingoCard").classList.remove(...[...$("bingoCard").classList].filter(name => name.startsWith("stamp"))); // And your stamp
+    if (state.stamp) $("bingoCard").classList.add("stamped", `stamp-${state.stamp}`);
     $("bingoAlert").hidden = countLines(marked) === 0;
     showReroll();
     showRerollLock();
@@ -809,10 +821,58 @@ function showFeed() {
             item.addEventListener("click", () => replay(event));
         }
         item.append(avatars, text, time);
+        if (["spot", "win", "achievement"].includes(event.type)) item.append(...reactionParts(event));
         return item;
     });
     $("feedList").replaceChildren(...items);
     $("feedEmpty").hidden = items.length > 0;
+}
+
+// A + beside a feed item's time that opens the emojis I can use, and under its words the ones people have put on it
+// (mine pressed, to take back off)
+function reactionParts(event) {
+    const row = el("div", "feed-reactions");
+    const chip = (emoji, label, className = "reaction") => {
+        const button = el("button", className, label);
+        button.type = "button";
+        button.addEventListener("click", click => {
+            click.stopPropagation(); // Not the host's replay
+            pickingFor = null;
+            sendReaction(event.id, emoji);
+        });
+        return button;
+    };
+    for (const [emoji, ids] of Object.entries(event.reactions ?? {})) {
+        const button = chip(emoji, `${emoji} ${ids.length}`);
+        button.setAttribute("aria-pressed", ids.includes(me.id));
+        button.title = listNames.format(ids.map(id => playerById(id).name));
+        row.append(button);
+    }
+    const add = el("button", "reaction react-add", pickingFor === event.id ? "×" : "☺+");
+    add.type = "button";
+    add.ariaLabel = pickingFor === event.id ? "Close emojis" : "Add an emoji";
+    add.setAttribute("aria-expanded", pickingFor === event.id);
+    add.addEventListener("click", click => {
+        click.stopPropagation();
+        pickingFor = pickingFor === event.id ? null : event.id;
+        showFeed();
+    });
+    if (pickingFor === event.id) row.append(...state.reactions.map(emoji => chip(emoji, emoji, "reaction react-pick")));
+    return row.hasChildNodes() ? [add, row] : [add];
+}
+
+// Someone's bingo celebration over everyone's screen for a few seconds: their pieces raining down (or bursting out)
+function celebrate({ id, pieces }) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const layer = el("div", `celebration celebrate-${id}`);
+    layer.ariaHidden = "true";
+    for (let i = 0; i < 40; i++) {
+        const piece = el("span", "", pieces[i % pieces.length]);
+        piece.style.cssText = `--x: ${Math.random() * 100}%; --delay: ${Math.random() * 0.8}s; --spin: ${Math.round(Math.random() * 720 - 360)}deg; --angle: ${Math.round(Math.random() * 360)}deg; --hue: ${Math.round(Math.random() * 360)}`;
+        layer.append(piece);
+    }
+    document.body.append(layer);
+    setTimeout(() => layer.remove(), 3500);
 }
 
 function showScoreboard(summary) {

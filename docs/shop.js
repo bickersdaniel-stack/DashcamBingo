@@ -6,7 +6,7 @@ import { coinsText, showNewSkins } from "./nav.js";
 const $ = id => document.getElementById(id);
 let shop = null;
 let rolling = false;
-const kinds = { frame: "Frames", title: "Titles", banner: "Banners" };
+const kinds = { frame: "Frames", title: "Titles", banner: "Banners", reactions: "Reaction packs", celebration: "Bingo celebrations", stamp: "Stamps" };
 
 $("rollButton").addEventListener("click", roll);
 
@@ -74,24 +74,28 @@ function showExtras() {
         const list = el("div", "extra-list");
         list.append(...shop.extras.filter(extra => extra.kind === kind).map(extraItem));
         const group = el("div", "extra-group");
-        group.append(el("p", "menu-label", label), list);
+        group.append(el("p", "menu-label", kind === "reactions" ? `${label} · ${shop.freeReactions.join(" ")} are free` : label), list);
         return group;
     }));
 }
 
-// What it looks like, its name, and Buy, Wear, or (pressed) Wearing to take it off
+// What it looks like, its name, and Buy, Wear, or (pressed) Wearing to take it off. Reaction packs are just owned
 function extraItem(extra) {
     const owned = shop.owned.includes(extra.id);
+    const wears = shop.wearable.includes(extra.kind);
     const wearing = shop.wearing[extra.kind] === extra.id;
     const item = el("div", `extra${wearing ? " wearing" : ""}`);
     if (extra.kind === "frame") item.append(Object.assign(el("img", `avatar extra-avatar frame-${extra.id}`), { src: shop.avatar, alt: "" }));
     if (extra.kind === "banner") item.append(el("span", `extra-banner banner-${extra.id}`));
+    if (extra.kind === "reactions" || extra.kind === "celebration") item.append(el("span", "extra-emoji", extra.emojis?.join(" ") ?? extra.icon));
+    if (extra.kind === "stamp") item.append(el("span", `bingo-cell crossed extra-stamp stamp-${extra.id}`));
     item.append(el("strong", extra.kind === "title" ? "extra-name player-title" : "extra-name", extra.name));
-    const button = el("button", `btn ${owned ? "btn-quiet" : "btn-primary"} extra-button`, wearing ? "✓ Wearing" : owned ? "Wear" : `${extra.price} 🪙`);
+    const button = el("button", `btn ${owned ? "btn-quiet" : "btn-primary"} extra-button`,
+        wearing ? "✓ Wearing" : owned ? (wears ? "Wear" : "✓ Owned") : `${extra.price} 🪙`);
     button.type = "button";
-    if (owned) button.setAttribute("aria-pressed", wearing);
-    else button.disabled = shop.coins < extra.price;
-    button.ariaLabel = `${wearing ? "Take off" : owned ? "Wear" : `Buy for ${extra.price} coins:`} ${extra.name}`;
+    if (owned && wears) button.setAttribute("aria-pressed", wearing);
+    else button.disabled = owned || shop.coins < extra.price;
+    button.ariaLabel = `${wearing ? "Take off" : owned ? (wears ? "Wear" : "Owned:") : `Buy for ${extra.price} coins:`} ${extra.name}`;
     button.addEventListener("click", () => owned ? wear(extra.kind, wearing ? null : extra.id) : buyExtra(extra.id));
     item.append(button);
     return item;

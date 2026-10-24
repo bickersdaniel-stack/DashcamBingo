@@ -555,6 +555,56 @@ body:not(.signed-in) .bar-coins, body.in-room .bar-coins {
     pointer-events: none;
     animation: coin-pop 0.9s ease-out forwards;
 }
+/* Stamps: how a marked square looks on your own card (in place of its skin's pattern), and how it lands */
+.stamped .bingo-cell.crossed:not(.center-cell), .extra-stamp {
+    background-image: var(--stamp-art);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: var(--stamp-size, 60% auto);
+}
+.stamped .bingo-cell.crossed:not(.center-cell) {
+    animation: var(--stamp-in) 0.35s ease-out;
+}
+.extra-stamp {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+}
+.extra-stamp::after {
+    display: none;
+}
+.stamp-big-tick {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M4 12.5l5 5L20 6.5' fill='none' stroke='%23fff' stroke-opacity='.4' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    --stamp-in: stamp-thump;
+}
+.stamp-star {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z' fill='%23fff' fill-opacity='.32'/></svg>");
+    --stamp-in: stamp-spin;
+}
+.stamp-roo-prints {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff' fill-opacity='.32'><ellipse cx='12' cy='15.5' rx='5' ry='4.5'/><circle cx='5.5' cy='9.5' r='2.2'/><circle cx='9.5' cy='5.8' r='2.2'/><circle cx='14.5' cy='5.8' r='2.2'/><circle cx='18.5' cy='9.5' r='2.2'/></svg>");
+    --stamp-in: stamp-thump;
+}
+.stamp-paint-splat {
+    --stamp-art:
+        radial-gradient(circle at 50% 52%, rgba(255, 255, 255, 0.3) 0 26%, transparent 27%),
+        radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.3) 0 9%, transparent 10%),
+        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.3) 0 7%, transparent 8%),
+        radial-gradient(circle at 74% 80%, rgba(255, 255, 255, 0.3) 0 10%, transparent 11%),
+        radial-gradient(circle at 20% 76%, rgba(255, 255, 255, 0.3) 0 6%, transparent 7%);
+    --stamp-size: 80% 80%;
+    --stamp-in: stamp-splat;
+}
+@keyframes stamp-thump {
+    from { transform: scale(1.18); }
+}
+@keyframes stamp-spin {
+    from { transform: rotate(-20deg) scale(0.85); }
+}
+@keyframes stamp-splat {
+    from { transform: scale(0.6); }
+    60% { transform: scale(1.08); }
+}
 @keyframes coin-pop {
     from { transform: translate(-50%, 0); opacity: 1; }
     to { transform: translate(-50%, -32px); opacity: 0; }
@@ -1400,6 +1450,43 @@ body.in-lobby .code-slots span {
 .feed-item.win {
     border-color: var(--stamp);
     background-color: var(--stamp-ambient);
+}
+/* Emojis on a feed item: a + beside its time, and the ones people put on it underneath */
+.feed-item {
+    flex-wrap: wrap;
+}
+.feed-reactions {
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-left: 38px;
+}
+.reaction {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background-color: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+.reaction:hover {
+    border-color: var(--border-strong);
+}
+.reaction[aria-pressed="true"] {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.react-add {
+    color: var(--text-faint);
+}
+/* Out of the way until you point at the item; phones always show it */
+@media (hover: hover) {
+    .feed-item:not(:hover, :focus-within) .react-add[aria-expanded="false"] {
+        opacity: 0;
+    }
 }
 .feed-item.undone {
     opacity: 0.65;
@@ -2596,6 +2683,58 @@ body.in-room .stage {
     font-size: 16px;
     color: var(--heading);
 }
+/* A bingo celebration over everyone's screen: pieces fall from the top (or burst, or hop across), then go */
+.celebration {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    overflow: hidden;
+    pointer-events: none;
+}
+.celebration span {
+    position: absolute;
+    top: -48px;
+    left: var(--x);
+    font-size: 30px;
+    animation: celebrate-fall 2.4s ease-in var(--delay) both;
+}
+@keyframes celebrate-fall {
+    to { transform: translateY(calc(100vh + 96px)) rotate(var(--spin)); }
+}
+.celebrate-confetti span {
+    width: 9px;
+    height: 15px;
+    border-radius: 2px;
+    background-color: hsl(var(--hue) 85% 60%);
+}
+.celebrate-fireworks span {
+    top: 40%;
+    left: 50%;
+    animation: celebrate-burst 1.8s cubic-bezier(0.1, 0.7, 0.3, 1) var(--delay) both;
+}
+@keyframes celebrate-burst {
+    0% { transform: rotate(var(--angle)) translateX(0) scale(0.4); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: rotate(var(--angle)) translateX(45vmin) scale(1); opacity: 0; }
+}
+.celebrate-roo-stampede span {
+    top: var(--x);
+    left: -48px;
+    animation: celebrate-hop 2.4s linear var(--delay) both;
+}
+@keyframes celebrate-hop {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(calc(25vw + 24px), -40px); }
+    50% { transform: translate(calc(50vw + 48px), 0); }
+    75% { transform: translate(calc(75vw + 72px), -40px); }
+    100% { transform: translate(calc(100vw + 96px), 0); }
+}
+.extra-emoji {
+    font-size: 22px;
+    line-height: 44px;
+    white-space: nowrap;
+}
+
 /* Extras: everything the shop sells besides skins, bought once and worn in a slot */
 .shop-extras {
     padding: 24px;
@@ -2608,7 +2747,7 @@ body.in-room .stage {
 }
 .extra-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
 }
 .extra {
@@ -3335,14 +3474,14 @@ button.collection-item:focus-visible {
     color: var(--amber);
 }
 /* Frames, round someone's picture wherever it shows. Each has a still ring for when motion is turned off */
-.frame-gold-ring {
+.avatar.frame-gold-ring {
     box-shadow: 0 0 0 2px #fbbf24, 0 0 8px rgba(251, 191, 36, 0.6);
 }
-.frame-hazard-tape {
+.avatar.frame-hazard-tape {
     box-shadow: 0 0 0 3px #1c1917;
     outline: 3px dashed #facc15;
 }
-.frame-police-lights {
+.avatar.frame-police-lights {
     box-shadow: 0 0 0 2px #ef4444, 0 0 0 4px #3b82f6;
     animation: police-lights 0.8s steps(1) infinite;
 }
@@ -3350,7 +3489,7 @@ button.collection-item:focus-visible {
     0% { box-shadow: 0 0 0 2px #ef4444, 0 0 10px #ef4444; }
     50% { box-shadow: 0 0 0 2px #3b82f6, 0 0 10px #3b82f6; }
 }
-.frame-rainbow-road {
+.avatar.frame-rainbow-road {
     box-shadow: 0 0 0 2px #a855f7;
     animation: rainbow-road 3s linear infinite;
 }

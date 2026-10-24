@@ -127,10 +127,11 @@ function showLobby() {
         });
     });
 
-    // Letters and numbers only, shown one per box with the next box highlighted
+    // Letters and numbers only, shown one per box with the next box highlighted. A pasted invite link gives its code
     const codeSlots = document.querySelectorAll(".code-slots span");
     const showCode = () => {
-        const typed = $("joinCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+        const value = $("joinCode").value;
+        const typed = (value.match(/\/r\/([a-z0-9]{5})/i)?.[1] ?? value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
         $("joinCode").value = typed;
         codeSlots.forEach((slot, i) => {
             slot.textContent = typed[i] ?? "";

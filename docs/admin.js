@@ -154,7 +154,11 @@ function showUsers() {
         coins.classList.add("wins-input", "coins-input");
         const coinsLabel = el("label", "check-label", "🪙 ");
         coinsLabel.append(coins);
-        const save = button("Save", "btn btn-primary", () => change({ wins: Number(wins.value), coins: Number(coins.value) }, `Saved ${user.name}'s wins and coins.`));
+        // Only what you edited: coins tick up while they play, so sending the number shown at load would undo them
+        const save = button("Save", "btn btn-primary", () => change({
+            ...(Number(wins.value) !== user.wins && { wins: Number(wins.value) }),
+            ...(Number(coins.value) !== user.coins && { coins: Number(coins.value) })
+        }, `Saved ${user.name}.`));
         showSaveWhenEdited(item, save);
         item.append(Object.assign(el("img", "avatar"), { src: user.avatar, alt: "" }), who, ...tags.map(tag => el("span", `user-tag tag-${tag.toLowerCase()}`, tag)),
             winsLabel, coinsLabel, save, el("span", "admin-stats", `Suggested ${user.suggested} · ${user.approved} added`));

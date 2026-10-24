@@ -1,6 +1,7 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
+import { skinInfo } from "./shop.js";
 import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
@@ -441,7 +442,8 @@ function stateFor(room, userId) {
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
-        card: { ids: card.ids, phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
+        // skins: your own equipped skin on each square (nobody else sees them)
+        card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(store.profiles[userId]?.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 

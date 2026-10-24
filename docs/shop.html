@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop · Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="bar-side">
+            <a class="pill together-link" href="/" aria-label="Back to rooms">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                <span class="together-label">Back to rooms</span>
+            </a>
+        </div>
+        <h1 class="bar-title">Dashcam Bingo</h1>
+        <div class="bar-side">
+            <span class="pill shop-coins" id="coins"></span>
+        </div>
+    </header>
+
+    <main class="panel-page shop-page">
+        <h2>Shop</h2>
+        <p class="email-message error" id="shopMessage" role="status" hidden></p>
+
+        <section class="shop-roll" id="rollSection">
+            <!-- The card flips over to show what you rolled -->
+            <div class="reveal" id="reveal">
+                <div class="reveal-inner" id="revealInner">
+                    <div class="reveal-face reveal-back play-card"><span class="reveal-logo">Dashcam<br>Bingo</span></div>
+                    <div class="reveal-face reveal-front play-card" id="revealFront"></div>
+                </div>
+            </div>
+            <div class="shop-side">
+                <p class="admin-hint">Each roll gives a skin for a random card. A card's first skin goes straight on, and only you see your skins. Rolling one you already have gives some coins back.</p>
+                <button class="btn btn-primary shop-roll-button" id="rollButton" type="button">Roll</button>
+                <p class="shop-result" id="rollResult" aria-live="polite"></p>
+                <p class="menu-label">Odds</p>
+                <ul class="shop-odds" id="odds"></ul>
+                <p class="shop-pity" id="pity"></p>
+            </div>
+        </section>
+
+        <section>
+            <div class="admin-tools shop-collection-tools">
+                <h3 class="shop-heading">Your collection</h3>
+                <select class="quality-select" id="collectionFilter" aria-label="Show">
+                    <option value="owned">Cards with skins</option>
+                    <option value="all">Every card</option>
+                    <option value="common">Common skins</option>
+                    <option value="rare">Rare skins</option>
+                    <option value="epic">Epic skins</option>
+                    <option value="legendary">Legendary skins</option>
+                </select>
+                <span class="admin-count" id="collectionCount"></span>
+            </div>
+            <div class="collection-grid" id="collection"></div>
+        </section>
+    </main>
+
+    <script type="module" src="/shop.js"></script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { cardRow, playerRow } from "./board.js";
+import { fillPlayCard, wearSkin } from "./playcard.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -315,6 +316,7 @@ function showRoom(socket) {
         checkBingo();
         showReroll();
     }, state.card.notes, state.card.counts);
+    [...$("bingoCard").children].forEach((cell, i) => wearSkin(cell, state.card.skins?.[i])); // Only you see your skins
     $("bingoAlert").hidden = countLines(marked) === 0;
     showReroll();
     showRerollLock();
@@ -999,9 +1001,6 @@ function showPackTotal() {
 // finger on it. Long enough that it doesn't pop up while you move around the card
 const tipDelayMs = 2000;
 const square = ".bingo-cell:not(.center-cell)";
-// Each pack gets its own colour on the details cards
-const hueOf = id => [...id].reduce((hue, letter) => (hue * 31 + letter.charCodeAt(0)) % 360, 200);
-
 async function loadCardInfo() {
     const { ok, data } = await api("GET", "/api/cards");
     if (!ok) return;
@@ -1009,18 +1008,14 @@ async function loadCardInfo() {
     cardInfo = new Map(data.cards.map(card => [card.id, { pack: card.pack, packName: packNames.get(card.pack) ?? "", rate: card.rate }]));
 }
 
-// The playing card: name and your count, a little road scene in the pack's colour, the rules, and the pack and how
-// often it turns up. (Skins, and one day abilities, belong here too)
+// The details card for a square, wearing your skin for that card if you have one on
 function playCard(cell) {
     const index = [...$("bingoCard").children].indexOf(cell);
     const info = cardInfo.get(state.card.ids?.[index]) ?? {};
-    const count = Number(cell.dataset.count);
-    const head = el("span", "play-card-head");
-    head.append(el("strong", "play-card-name", cell.querySelector(".cell-text").textContent), ...(count ? [el("span", "play-card-count", `×${count}`)] : []));
-    const foot = el("span", "play-card-foot");
-    foot.append(el("span", "", info.packName ?? ""), el("span", "", info.rate == null ? "New card" : `Spotted ${info.rate}%`));
-    $("cardTip").style.setProperty("--pack-hue", hueOf(info.pack ?? ""));
-    $("cardTip").replaceChildren(head, el("span", "play-card-art"), el("span", "play-card-text", cell.dataset.note || "No special rules. If you see it, count it."), foot);
+    fillPlayCard($("cardTip"), {
+        name: cell.querySelector(".cell-text").textContent, count: Number(cell.dataset.count), note: cell.dataset.note,
+        packId: info.pack, packName: info.packName, rate: info.rate, skin: state.card.skins?.[index]
+    });
 }
 
 function setUpCardTips() {

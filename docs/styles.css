@@ -1873,11 +1873,9 @@ body.in-room .stage {
 .bingo-cell {
     -webkit-touch-callout: none;
 }
-/* A square's details as a playing card (5:7), coloured by its pack (--pack-hue) */
-.card-tip {
+/* A card as a playing card (5:7), coloured by its pack (--pack-hue) or by its skin (see playcard.js) */
+.play-card {
     --pack: hsl(var(--pack-hue, 200) 55% 45%);
-    position: fixed;
-    z-index: 60;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1885,10 +1883,15 @@ body.in-room .stage {
     aspect-ratio: 5 / 7;
     padding: 10px;
     box-sizing: border-box;
-    border: 3px solid var(--pack);
+    border: 3px solid var(--skin-edge, var(--pack));
     border-radius: 16px;
     background-color: var(--surface);
     box-shadow: 0 18px 40px var(--shadow);
+}
+/* The room's details pop-up, opened at the pointer */
+.card-tip {
+    position: fixed;
+    z-index: 60;
     pointer-events: none;
     animation: card-in 0.18s ease-out;
 }
@@ -1922,7 +1925,9 @@ body.in-room .stage {
     height: 38%;
     overflow: hidden;
     border-radius: 9px;
-    background: linear-gradient(hsl(var(--pack-hue, 200) 70% 78%), var(--pack));
+    background: var(--skin-art, linear-gradient(hsl(var(--pack-hue, 200) 70% 78%), var(--pack)));
+    background-size: var(--skin-art-size, auto);
+    animation: var(--skin-move, none);
 }
 .play-card-art::before, .play-card-art::after {
     content: "";
@@ -1959,6 +1964,269 @@ body.in-room .stage {
     font-size: 11px;
     font-weight: 600;
     color: var(--text-faint);
+}
+
+/* Skins: each sets an edge colour, a quiet pattern for squares (--skin-bg) and art for its card (--skin-art).
+   The rarity sets the gem's colour */
+.rarity-common { --rarity: #9ca3af; }
+.rarity-rare { --rarity: #3b82f6; }
+.rarity-epic { --rarity: #a855f7; }
+.rarity-legendary { --rarity: #f59e0b; }
+.play-card-gem {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background-color: var(--rarity);
+    transform: rotate(45deg);
+}
+.play-card.rarity-legendary {
+    animation: legendary-glow 2.4s ease-in-out infinite;
+}
+.card-tip.rarity-legendary {
+    animation: card-in 0.18s ease-out, legendary-glow 2.4s ease-in-out infinite;
+}
+@keyframes legendary-glow {
+    50% { box-shadow: 0 0 28px rgba(245, 158, 11, 0.65), 0 18px 40px var(--shadow); }
+}
+/* On your own squares a skin is quieter: its edge, its pattern, and a gem in the corner */
+.bingo-cell.skinned {
+    border-color: var(--skin-edge);
+    background-image: var(--skin-bg, none);
+}
+.bingo-cell.skinned::before {
+    content: "";
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 7px;
+    height: 7px;
+    border-radius: 1px;
+    background-color: var(--rarity);
+    transform: rotate(45deg);
+}
+@keyframes skin-slide {
+    to { background-position: 200% 50%; }
+}
+.skin-matte {
+    --skin-edge: #6b7280;
+    --skin-art: linear-gradient(#9ca3af, #4b5563);
+}
+.skin-pastel {
+    --skin-edge: #f9a8d4;
+    --skin-bg: linear-gradient(135deg, rgba(249, 168, 212, 0.25), rgba(147, 197, 253, 0.25));
+    --skin-art: linear-gradient(135deg, #fbcfe8, #bfdbfe, #bbf7d0);
+}
+.skin-road-sign {
+    --skin-edge: #eab308;
+    --skin-bg: repeating-linear-gradient(45deg, rgba(234, 179, 8, 0.18) 0 6px, transparent 6px 12px);
+    --skin-art: repeating-linear-gradient(45deg, #facc15 0 14px, #1f2937 14px 28px);
+}
+.skin-neon {
+    --skin-edge: #ec4899;
+    --skin-bg: radial-gradient(circle at 50% 120%, rgba(236, 72, 153, 0.3), transparent 60%);
+    --skin-art: linear-gradient(#0f0a1e, #3b0764 60%, #db2777);
+}
+.play-card.skin-neon {
+    box-shadow: 0 0 16px rgba(236, 72, 153, 0.7), 0 0 36px rgba(34, 211, 238, 0.35);
+}
+.skin-carbon {
+    --skin-edge: #374151;
+    --skin-bg: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.1) 0 2px, transparent 2px 5px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 0 2px, transparent 2px 5px);
+    --skin-art: repeating-linear-gradient(45deg, #111827 0 3px, #374151 3px 6px), #1f2937;
+}
+.skin-vhs {
+    --skin-edge: #22d3ee;
+    --skin-bg: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.08) 0 1px, transparent 1px 3px);
+    --skin-art: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px), linear-gradient(#7c3aed, #db2777, #f59e0b);
+}
+.skin-holo {
+    --skin-edge: #a78bfa;
+    --skin-bg: linear-gradient(120deg, rgba(255, 0, 150, 0.16), rgba(0, 200, 255, 0.16), rgba(255, 230, 0, 0.16));
+    --skin-art: linear-gradient(120deg, #f0abfc, #67e8f9, #fde047, #86efac, #f0abfc);
+    --skin-art-size: 200% 100%;
+    --skin-move: skin-slide 4s linear infinite;
+}
+.skin-chrome {
+    --skin-edge: #cbd5e1;
+    --skin-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(148, 163, 184, 0.25));
+    --skin-art: linear-gradient(#f8fafc, #94a3b8 45%, #e2e8f0 55%, #64748b);
+}
+.skin-sunset {
+    --skin-edge: #f97316;
+    --skin-bg: linear-gradient(rgba(251, 146, 60, 0.22), rgba(124, 45, 18, 0.18));
+    --skin-art: linear-gradient(#fde68a, #fb923c 45%, #c2410c 70%, #7c2d12);
+}
+.skin-gold {
+    --skin-edge: #f59e0b;
+    --skin-bg: linear-gradient(135deg, rgba(253, 224, 71, 0.35), rgba(180, 83, 9, 0.25));
+    --skin-art: linear-gradient(110deg, #92400e, #f59e0b 30%, #fef3c7 50%, #f59e0b 70%, #92400e);
+    --skin-art-size: 200% 100%;
+    --skin-move: skin-slide 3s linear infinite;
+}
+.skin-southern-cross {
+    --skin-edge: #1e3a8a;
+    --skin-bg: radial-gradient(circle at 25% 30%, rgba(255, 255, 255, 0.5) 1px, transparent 1.5px), radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.5) 1px, transparent 1.5px);
+    --skin-art: radial-gradient(circle at 50% 18%, #fff 2px, transparent 3px), radial-gradient(circle at 34% 40%, #fff 2px, transparent 3px), radial-gradient(circle at 64% 36%, #fff 2px, transparent 3px), radial-gradient(circle at 50% 62%, #fff 2.5px, transparent 3.5px), radial-gradient(circle at 58% 48%, #fff 1.5px, transparent 2.5px), linear-gradient(#0b1437, #1e3a8a);
+}
+
+/* The shop: the card that flips over to show a roll, the odds, and your collection */
+.shop-coins {
+    font-weight: 800;
+    color: var(--amber);
+}
+.panel-page.shop-page {
+    display: block;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+    overflow-y: auto;
+}
+.shop-roll {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 40px;
+    margin: 8px 0 36px;
+}
+.shop-side {
+    flex: 1 1 280px;
+    max-width: 460px;
+}
+.shop-roll-button {
+    padding: 14px 32px;
+    font-size: 16px;
+}
+.shop-result {
+    min-height: 1.5em;
+    margin: 12px 0 4px;
+    font-size: 14px;
+    color: var(--heading);
+}
+.shop-odds {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.shop-odd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 240px;
+    font-size: 13px;
+    color: var(--cell-text);
+}
+.shop-chance {
+    margin-left: auto;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.shop-pity {
+    margin: 12px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.reveal {
+    position: relative;
+    width: 220px;
+    border-radius: 16px;
+    perspective: 1000px;
+    transition: box-shadow 0.5s 0.5s;
+}
+.reveal[class*="rarity-"] {
+    box-shadow: 0 0 44px var(--rarity);
+}
+.reveal-inner {
+    position: relative;
+    width: 220px;
+    aspect-ratio: 5 / 7;
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reveal-inner.flipped {
+    transform: rotateY(180deg);
+}
+.reveal-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+}
+.reveal-front {
+    transform: rotateY(180deg);
+}
+.reveal-back {
+    align-items: center;
+    justify-content: center;
+    border-color: var(--surface-4);
+    background: repeating-linear-gradient(45deg, var(--stamp) 0 10px, var(--stamp-glow) 10px 20px);
+}
+.reveal-logo {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background-color: var(--surface);
+    font-weight: 800;
+    text-align: center;
+    color: var(--heading);
+}
+.reveal.rolling .reveal-inner {
+    animation: shake 0.3s ease-in-out infinite;
+}
+@keyframes shake {
+    25% { transform: rotate(-3deg); }
+    75% { transform: rotate(3deg); }
+}
+/* A legendary bursts out in gold */
+.reveal.burst::after {
+    content: "";
+    position: absolute;
+    inset: -60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.6), transparent 70%);
+    pointer-events: none;
+    animation: burst 1.4s 0.6s ease-out both;
+}
+@keyframes burst {
+    from { transform: scale(0.3); opacity: 1; }
+    to { transform: scale(1.6); opacity: 0; }
+}
+.shop-collection-tools {
+    margin-bottom: 16px;
+}
+.shop-heading {
+    flex: 1;
+    margin: 0;
+    font-size: 16px;
+    color: var(--heading);
+}
+.collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 18px;
+}
+.collection-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.collection-item .quality-select {
+    width: 150px;
+}
+.play-card.mini {
+    width: 150px;
+    gap: 5px;
+    padding: 7px;
+    border-width: 2px;
+    border-radius: 12px;
+    box-shadow: none;
+}
+.play-card.mini .play-card-name {
+    font-size: 12px;
+}
+.play-card.mini .play-card-text, .play-card.mini .play-card-foot {
+    font-size: 10px;
 }
 
 /* Pages like the admin page and leaderboard: a heading, tabs and long lists */

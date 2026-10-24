@@ -78,3 +78,51 @@ test("recordProgress unlocks achievements once, pays their coins, and handles on
     assert.deepEqual(recordProgress(profile, {}, { hour: 2 }).map(a => a.id), ["night-shift"]);
     assert.deepEqual(recordProgress(profile, {}, { bingoMs: 600_000, hour: 12, count: 2, marked: 3 }), [], "nothing for an ordinary moment");
 });
+
+// The same "random" numbers every run: random(n) gives 0 to n - 1
+function seeded(seed) {
+    return n => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return Math.floor(seed / 2147483648 * n);
+    };
+}
+const shopCards = Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, text: `Card ${i}`, pack: "core" }));
+
+test("roll lands on each rarity about as often as the odds say", async () => {
+    const { roll } = await import("./shop.js");
+    const random = seeded(42);
+    const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    for (let i = 0; i < 20000; i++) counts[roll(shopCards, { pity: 0 }, random).rarity.id]++;
+    const share = id => counts[id] / 20000 * 100;
+    assert.ok(Math.abs(share("common") - 60) < 2, `common ${share("common")}%`);
+    assert.ok(Math.abs(share("rare") - 28) < 2, `rare ${share("rare")}%`);
+    assert.ok(Math.abs(share("epic") - 10) < 1.5, `epic ${share("epic")}%`);
+    assert.ok(Math.abs(share("legendary") - 2) < 0.7, `legendary ${share("legendary")}%`);
+});
+
+test("buy takes the coins, puts a card's first skin on, refunds duplicates, and guarantees an epic after 10 misses", async () => {
+    const { buy, rollCost, duplicateRefund, pityAfter } = await import("./shop.js");
+    assert.match(buy({ coins: 50 }, shopCards).error, /costs 100 coins/);
+
+    const profile = { coins: rollCost * 3 };
+    const first = buy(profile, shopCards, seeded(1));
+    assert.equal(profile.skins[first.card.id].equipped, first.skin.id, "first skin goes on");
+    assert.equal(profile.coins, rollCost * 2);
+
+    // The same card and style again: a duplicate, with coins back
+    const again = buy(profile, [shopCards.find(c => c.id === first.card.id)], seeded(1));
+    if (again.skin.id === first.skin.id) {
+        assert.equal(again.duplicate, true);
+        assert.equal(profile.coins, rollCost + duplicateRefund);
+    }
+
+    // Ten rolls with no epic or better, then the next one is
+    const unlucky = { coins: 0, pity: pityAfter };
+    unlucky.coins = rollCost;
+    const pityRoll = buy(unlucky, shopCards, () => 0); // Would be common without the guarantee
+    assert.ok(["epic", "legendary"].includes(pityRoll.skin.rarity));
+    assert.equal(unlucky.pity, 0, "the count starts again");
+    const ordinary = { coins: rollCost, pity: 3 };
+    assert.equal(buy(ordinary, shopCards, () => 0).skin.rarity, "common");
+    assert.equal(ordinary.pity, 4);
+});

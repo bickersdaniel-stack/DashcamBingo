@@ -90,11 +90,24 @@ function showCards() {
         const text = input(card.text, 60, "Card wording");
         const description = textarea(card.description, "Description (optional)");
         const pack = fillPackSelect(el("select", "quality-select pack-select"), card.pack);
-        const r = rate(card);
-        const stats = el("span", "admin-stats", r === null ? "Not enough games yet" : `Spotted ${Math.round(r * 100)}%`);
-        stats.title = `Marked on ${card.spotted} of the ${card.dealt} cards it was dealt on`;
+        const counted = Object.assign(input(String(card.counted ?? 0), 6, `Counted for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const spotted = Object.assign(input(String(card.spotted ?? 0), 6, `Marked deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const dealt = Object.assign(input(String(card.dealt ?? 0), 6, `Deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        counted.classList.add("wins-input");
+        spotted.classList.add("wins-input");
+        dealt.classList.add("wins-input");
+        const stats = el("span", "admin-counts");
+        const countedLabel = el("label", "check-label", "Counted ");
+        const markedLabel = el("label", "check-label", "Marked ");
+        countedLabel.append(counted);
+        markedLabel.append(spotted, " / ", dealt);
+        stats.append(countedLabel, markedLabel);
+        stats.title = "Counted is every sighting. Marked / dealt is how often it was on a card and got marked.";
         const save = button("Save", "btn btn-primary", async () => {
-            const result = await api("PATCH", `/api/admin/cards/${card.id}`, { text: text.value, description: description.value, pack: pack.value });
+            const result = await api("PATCH", `/api/admin/cards/${card.id}`, {
+                text: text.value, description: description.value, pack: pack.value,
+                counted: Number(counted.value), spotted: Number(spotted.value), dealt: Number(dealt.value)
+            });
             if (done(result, "Saved.")) load();
         });
         const remove = button("Delete", "link-button", async () => {

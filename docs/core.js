@@ -203,14 +203,113 @@ export function setCount(cell, count) {
     cell.setAttribute("aria-pressed", count > 0);
 }
 
+// Draw the card ourselves. html2canvas drops spaces and doubles letters with this font.
 export function captureScreenshot() {
-    const container = document.getElementById("bingoCardContainer");
-    container.classList.add("capturing"); // Show the title in the screenshot
+    const cells = [...bingoCard.children];
+    const phrases = cells.map((cell, i) => i === 12 ? "FREE" : cell.querySelector(".cell-text").textContent);
+    const counts = cells.map(cell => Number(cell.dataset.count) || 0);
+    drawCardShot(phrases, counts).toBlob(blob => addWinningCard(blob));
+}
 
-    html2canvas(container, { backgroundColor: getComputedStyle(document.body).backgroundColor }).then(canvas => {
-        container.classList.remove("capturing");
-        canvas.toBlob(blob => addWinningCard(blob));
+function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function wrapText(ctx, text, maxWidth) {
+    const lines = [];
+    let line = "";
+    for (const word of text.split(/\s+/)) {
+        const next = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(next).width > maxWidth) {
+            lines.push(line);
+            line = word;
+        } else line = next;
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+}
+
+function drawCardShot(phrases, counts) {
+    const size = 930;
+    const titleH = 56;
+    const pad = 18;
+    const gap = 10;
+    const cell = (size - pad * 2 - gap * 4) / 5;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size + titleH;
+    const ctx = canvas.getContext("2d");
+    const stamp = cssVar("--stamp");
+    const stampText = cssVar("--stamp-text");
+    const heading = cssVar("--heading");
+    const cellBg = cssVar("--cell-bg");
+    const cellText = cssVar("--cell-text");
+    const border = cssVar("--border");
+    const boardBg = cssVar("--board-bg");
+    const pageBg = getComputedStyle(document.body).backgroundColor;
+    const font = '"Plus Jakarta Sans", system-ui, sans-serif';
+
+    ctx.fillStyle = pageBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    roundRect(ctx, 0, 0, canvas.width, canvas.height, 16);
+    ctx.fillStyle = boardBg;
+    ctx.fill();
+
+    ctx.fillStyle = heading;
+    ctx.font = `800 22px ${font}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Dashcam Bingo", size / 2, titleH / 2);
+
+    phrases.forEach((phrase, i) => {
+        const col = i % 5;
+        const row = Math.floor(i / 5);
+        const x = pad + col * (cell + gap);
+        const y = titleH + pad + row * (cell + gap);
+        const marked = i === 12 || counts[i] > 0;
+        roundRect(ctx, x, y, cell, cell, 12);
+        ctx.fillStyle = marked ? stamp : cellBg;
+        ctx.fill();
+        ctx.strokeStyle = marked ? "rgba(255, 255, 255, 0.2)" : border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = marked ? stampText : cellText;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        if (i === 12) {
+            ctx.font = `800 16px ${font}`;
+            ctx.fillText("FREE", x + cell / 2, y + cell / 2);
+            return;
+        }
+        const maxWidth = cell - 16;
+        ctx.font = `500 13px ${font}`;
+        const lines = wrapText(ctx, phrase, maxWidth);
+        const lineH = 17;
+        let start = y + cell / 2 - (lines.length - 1) * lineH / 2;
+        for (const line of lines) {
+            ctx.fillText(line, x + cell / 2, start);
+            start += lineH;
+        }
+        if (counts[i] > 0) {
+            const badge = 15;
+            const bx = x + cell - 8 - badge / 2;
+            const by = y + 8 + badge / 2;
+            ctx.beginPath();
+            ctx.arc(bx, by, badge / 2, 0, Math.PI * 2);
+            ctx.fillStyle = stampText;
+            ctx.fill();
+            ctx.fillStyle = stamp;
+            ctx.font = `800 10px ${font}`;
+            ctx.fillText(String(counts[i]), bx, by);
+        }
     });
+    return canvas;
 }
 
 function addWinningCard(blob) {

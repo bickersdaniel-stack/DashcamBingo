@@ -34,11 +34,22 @@ cards.post("/api/admin/cards", adminOnly, json, (req, res) => {
     const card = { text: tidy(req.body?.text), description: tidyLines(req.body?.description), pack: String(req.body?.pack ?? "") };
     const problem = cardProblem(card);
     if (problem) return res.status(400).json({ error: problem });
-    const row = { id: randomUUID(), ...card, by: null, at: Date.now(), dealt: 0, spotted: 0 };
+    const row = { id: randomUUID(), ...card, by: null, at: Date.now(), dealt: 0, spotted: 0, counted: 0 };
     store.cards.push(row);
     save();
     res.json(row);
 });
+
+// counted = every sighting, spotted = marked on a deal, dealt = times it was on a card
+export function cardStatsProblem(body) {
+    for (const name of ["counted", "spotted", "dealt"]) {
+        if (body?.[name] === undefined) continue;
+        if (!(Number.isInteger(body[name]) && body[name] >= 0 && body[name] <= 100_000)) {
+            return "Counts must be whole numbers from 0 to 100000.";
+        }
+    }
+    return null;
+}
 
 cards.patch("/api/admin/cards/:id", adminOnly, json, (req, res) => {
     const row = store.cards.find(card => card.id === req.params.id);
@@ -48,9 +59,11 @@ cards.patch("/api/admin/cards/:id", adminOnly, json, (req, res) => {
         description: field(req.body, "description", row.description, tidyLines),
         pack: field(req.body, "pack", row.pack, String)
     };
-    const problem = cardProblem(card, row.id);
+    const problem = cardProblem(card, row.id) ?? cardStatsProblem(req.body);
     if (problem) return res.status(400).json({ error: problem });
-    Object.assign(row, card);
+    const stats = {};
+    for (const name of ["counted", "spotted", "dealt"]) if (req.body?.[name] !== undefined) stats[name] = req.body[name];
+    Object.assign(row, card, stats);
     save();
     res.json(row);
 });

@@ -26,7 +26,7 @@ export function migrate(data, lines) {
     data.cards = [
         ...lines.map(text => ({ id: randomUUID(), text, by: null, at: now })),
         ...(data.approved ?? []).map(({ id, text, by, at }) => ({ id, text, by, at }))
-    ].map(card => ({ ...card, description: "", pack: "core", dealt: 0, spotted: 0 }));
+    ].map(card => ({ ...card, description: "", pack: "core", dealt: 0, spotted: 0, counted: 0 }));
     delete data.approved;
     return data;
 }

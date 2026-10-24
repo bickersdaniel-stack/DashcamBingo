@@ -78,22 +78,32 @@ function showAchievements(list) {
     }));
 }
 
-// The three most spotted and the rare sightings as playing cards, then every card, searchable and by pack
+// The three most spotted and the rare sightings as playing cards, then every card by how often it's been counted
 function showCards(cards) {
-    const placed = cards.map((card, i) => ({ card, place: i + 1 })); // Places stay put while the list is filtered
-    const ranked = placed.filter(({ card }) => card.rate !== null);
-    const rare = ranked.filter(({ card }) => card.rare).reverse(); // Rarest first
-    const strip = list => list.map(({ card, place }) => {
+    const byRate = cards.filter(card => card.rate !== null);
+    const rare = [...byRate].filter(card => card.rare).reverse(); // Rarest first
+    const strip = (list, rareLabel) => list.map((card, i) => {
         const item = el("div", "strip-item");
         const face = el("div", "play-card mini");
-        fillPlayCard(face, { name: card.text, note: card.description, packId: card.packId, packName: card.pack, rate: card.rate });
-        item.append(el("span", `podium-rank board-rank ${card.rare ? "" : ["gold", "silver", "bronze"][place - 1] ?? ""}`, card.rare ? "Rare" : `#${place}`), face);
+        fillPlayCard(face, { name: card.text, note: card.description, packId: card.packId, packName: card.pack, rate: card.rate, count: card.counted });
+        item.append(el("span", `podium-rank board-rank ${rareLabel ? "" : ["gold", "silver", "bronze"][i] ?? ""}`, rareLabel ? "Rare" : `#${i + 1}`), face);
         return item;
     });
-    $("topCards").replaceChildren(...strip(ranked.slice(0, 3)));
-    $("rareCards").replaceChildren(...strip(rare));
-    $("cardHighlights").hidden = !ranked.length;
+    $("topCards").replaceChildren(...strip(byRate.slice(0, 3)));
+    $("rareCards").replaceChildren(...strip(rare, true));
+    $("cardHighlights").hidden = !byRate.length;
     $("rarePanel").hidden = !rare.length;
+
+    // Most counted first; places stay put while the list is filtered
+    const ordered = [...cards].sort((a, b) => (b.counted ?? 0) - (a.counted ?? 0) || (b.rate ?? -1) - (a.rate ?? -1) || a.text.localeCompare(b.text));
+    let last = null, lastPlace = 0;
+    const placed = ordered.map((card, i) => {
+        const n = card.counted ?? 0;
+        const place = n === last ? lastPlace : i + 1;
+        last = n;
+        lastPlace = place;
+        return { card, place };
+    });
 
     $("cardPack").append(...[...new Set(cards.map(card => card.pack))].sort().map(pack => new Option(pack, pack)));
     const showList = () => {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { packsFrom, pickCards } from "./rooms.js";
+import { cardStatsProblem } from "./cards.js";
 import { migrate, store } from "./store.js";
 import { tidyLines } from "./suggestions.js";
 
@@ -17,10 +18,18 @@ test("migrate turns the phrase list and approved suggestions into Core cards", (
     const data = migrate({ approved: [{ id: "s1", text: "Love tap", by, at: 5 }], suggestions: [] }, ["Speed camera", "Ute driver"]);
     assert.deepEqual(data.packs, [{ id: "core", name: "Core", description: "", on: true }]);
     assert.deepEqual(data.cards.map(c => c.text), ["Speed camera", "Ute driver", "Love tap"]);
-    assert.ok(data.cards.every(c => c.pack === "core" && c.dealt === 0 && c.spotted === 0 && c.description === ""));
-    assert.deepEqual(data.cards[2], { id: "s1", text: "Love tap", by, at: 5, description: "", pack: "core", dealt: 0, spotted: 0 });
+    assert.ok(data.cards.every(c => c.pack === "core" && c.dealt === 0 && c.spotted === 0 && c.counted === 0 && c.description === ""));
+    assert.deepEqual(data.cards[2], { id: "s1", text: "Love tap", by, at: 5, description: "", pack: "core", dealt: 0, spotted: 0, counted: 0 });
     assert.equal("approved" in data, false);
     assert.equal(migrate(data, ["Other"]).cards.length, 3); // Already migrated: left alone
+});
+
+test("cardStatsProblem accepts whole counts and rejects junk", () => {
+    assert.equal(cardStatsProblem({}), null);
+    assert.equal(cardStatsProblem({ counted: 5, spotted: 2, dealt: 10 }), null);
+    assert.match(cardStatsProblem({ counted: -1 }), /whole number/);
+    assert.match(cardStatsProblem({ spotted: 1.5 }), /whole number/);
+    assert.match(cardStatsProblem({ dealt: 100001 }), /whole number/);
 });
 
 test("pickCards deals 24 different cards, 8 from each third by how often they're spotted", () => {

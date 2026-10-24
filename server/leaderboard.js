@@ -22,7 +22,7 @@ export function rankCards(cards, packs) {
     const packName = id => packs.find(pack => pack.id === id)?.name ?? "";
     const row = card => ({
         id: card.id, text: card.text, description: card.description ?? "", pack: packName(card.pack), packId: card.pack,
-        counted: card.counted ?? 0, dealt: card.dealt ?? 0
+        counted: card.counted ?? 0, spotted: card.spotted ?? 0, dealt: card.dealt ?? 0
     });
     const ranked = cards.filter(card => card.dealt >= minDeals)
         .map(card => ({ ...row(card), rate: Math.round(card.spotted / card.dealt * 100) }))

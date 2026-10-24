@@ -1665,8 +1665,29 @@ body.in-room .stage {
     padding: 10px;
 }
 .room-grid .win-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 8px;
     min-height: 0;
+}
+.room-grid .win-card {
+    padding: 8px;
+}
+.room-grid .win-head {
+    gap: 6px;
+}
+.room-grid .win-num {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+}
+.room-grid .win-title {
+    font-size: 11px;
+}
+.room-grid .win-time, .room-grid .win-tag {
+    font-size: 9px;
+}
+.room-grid .win-card img {
+    margin-top: 6px;
 }
 .room-grid .sidebar-foot {
     padding: 8px 12px;
@@ -2793,6 +2814,18 @@ button.collection-item:focus-visible {
 .admin-row > .pack-select, .admin-row > .admin-stats {
     flex: 0 0 9.5rem;
     box-sizing: border-box;
+}
+.admin-row > .admin-counts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    flex: 0 0 16rem;
+    box-sizing: border-box;
+}
+.admin-counts .wins-input {
+    flex: 0 0 4.2em;
+    width: 4.2em;
 }
 .admin-row > .item-by {
     flex: 0 0 9rem;

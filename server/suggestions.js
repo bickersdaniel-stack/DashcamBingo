@@ -74,7 +74,7 @@ suggestions.post("/api/admin/suggestions/:id", adminOnly, json, (req, res) => {
         const problem = cardProblem(card, suggestion.id);
         if (problem) return res.status(400).json({ error: problem });
         Object.assign(suggestion, { status: "approved", text: card.text, description: card.description });
-        store.cards.push({ id: suggestion.id, ...card, by: suggestion.by, at: Date.now(), dealt: 0, spotted: 0 });
+        store.cards.push({ id: suggestion.id, ...card, by: suggestion.by, at: Date.now(), dealt: 0, spotted: 0, counted: 0 });
     } else {
         return res.status(400).json({ error: "Approve or reject." });
     }

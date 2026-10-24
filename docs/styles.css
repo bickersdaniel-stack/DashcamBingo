@@ -1869,35 +1869,96 @@ body.in-room .stage {
     cursor: not-allowed;
 }
 
-/* A square with a description shows it in a tip at the pointer after a while */
-.bingo-cell.has-note {
-    -webkit-touch-callout: none; /* Holding shows the description, not the phone's own menu */
+/* Holding a square opens its details card, so the phone's own long-press menu stays out of the way */
+.bingo-cell {
+    -webkit-touch-callout: none;
 }
+/* A square's details as a playing card (5:7), coloured by its pack (--pack-hue) */
 .card-tip {
+    --pack: hsl(var(--pack-hue, 200) 55% 45%);
     position: fixed;
     z-index: 60;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    max-width: min(260px, calc(100vw - 16px));
-    padding: 10px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
+    gap: 8px;
+    width: 220px;
+    aspect-ratio: 5 / 7;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 3px solid var(--pack);
+    border-radius: 16px;
     background-color: var(--surface);
-    box-shadow: 0 12px 30px var(--shadow);
-    font-size: 13px;
-    line-height: 1.4;
+    box-shadow: 0 18px 40px var(--shadow);
     pointer-events: none;
+    animation: card-in 0.18s ease-out;
 }
 .card-tip[hidden] {
     display: none;
 }
-.card-tip strong {
+@keyframes card-in {
+    from { transform: translateY(6px) scale(0.96); opacity: 0; }
+}
+.play-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.play-card-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.25;
     color: var(--heading);
 }
-.card-tip span {
+.play-card-count {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--pack);
+}
+/* A road running off into a sky in the pack's colour */
+.play-card-art {
+    position: relative;
+    flex: none;
+    height: 38%;
+    overflow: hidden;
+    border-radius: 9px;
+    background: linear-gradient(hsl(var(--pack-hue, 200) 70% 78%), var(--pack));
+}
+.play-card-art::before, .play-card-art::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    height: 58%;
+    transform: translateX(-50%);
+}
+.play-card-art::before {
+    width: 150%;
+    background-color: #2b2f36;
+    clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%);
+}
+.play-card-art::after {
+    width: 8px;
+    background: repeating-linear-gradient(to top, #facc15 0 10px, transparent 10px 18px);
+    clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%);
+}
+.play-card-text {
+    flex: 1;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.45;
     color: var(--text-muted);
     white-space: pre-line;
+}
+.play-card-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
 }
 
 /* Pages like the admin page and leaderboard: a heading, tabs and long lists */

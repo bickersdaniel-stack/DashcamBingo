@@ -14,6 +14,7 @@ const signInOptions = me ? {} : await meResponse.json().catch(() => ({})); // Wh
 const listNames = new Intl.ListFormat("en-AU", { type: "conjunction" });
 let state = null;         // What the server last said about the room
 let marked = new Set();   // My marked squares
+let cardInfo = new Map(); // Card id -> its pack and how often it's spotted, for the details cards
 let bestLines = 0;        // Most lines on my card this round, so only a new line takes a screenshot
 const pulses = new Map(); // Square index -> timer, for squares someone else just spotted
 let videoSeenAt = 0;      // When the video's time last arrived, to count on from
@@ -144,7 +145,10 @@ function joinRoom() {
         showRoom(socket);
         // A new round while you're here: show how the last one went (not after a refresh or rejoin)
         if (previousRound && state.round.number > previousRound && state.lastRound) showScoreboard(state.lastRound);
-        if (state.round.number !== previousRound) showMiniBoard(); // Wins may have changed
+        if (state.round.number !== previousRound) { // Wins, cards and their stats may have changed
+            showMiniBoard();
+            loadCardInfo();
+        }
     });
     socket.on("room:gone", message => leaveRoomView(socket, message)); // The host ended it, or you left in another tab
     socket.on("player:left", id => {
@@ -991,9 +995,33 @@ function showPackTotal() {
     return enough;
 }
 
-// Squares with a description show it at the pointer after a while: resting the mouse on one, or holding a finger on it.
-// Long enough that it doesn't pop up while you move around the card
+// A square's details open as a playing card at the pointer after a while: resting the mouse on it, or holding a
+// finger on it. Long enough that it doesn't pop up while you move around the card
 const tipDelayMs = 2000;
+const square = ".bingo-cell:not(.center-cell)";
+// Each pack gets its own colour on the details cards
+const hueOf = id => [...id].reduce((hue, letter) => (hue * 31 + letter.charCodeAt(0)) % 360, 200);
+
+async function loadCardInfo() {
+    const { ok, data } = await api("GET", "/api/cards");
+    if (!ok) return;
+    const packNames = new Map(data.packs.map(pack => [pack.id, pack.name]));
+    cardInfo = new Map(data.cards.map(card => [card.id, { pack: card.pack, packName: packNames.get(card.pack) ?? "", rate: card.rate }]));
+}
+
+// The playing card: name and your count, a little road scene in the pack's colour, the rules, and the pack and how
+// often it turns up. (Skins, and one day abilities, belong here too)
+function playCard(cell) {
+    const index = [...$("bingoCard").children].indexOf(cell);
+    const info = cardInfo.get(state.card.ids?.[index]) ?? {};
+    const count = Number(cell.dataset.count);
+    const head = el("span", "play-card-head");
+    head.append(el("strong", "play-card-name", cell.querySelector(".cell-text").textContent), ...(count ? [el("span", "play-card-count", `×${count}`)] : []));
+    const foot = el("span", "play-card-foot");
+    foot.append(el("span", "", info.packName ?? ""), el("span", "", info.rate == null ? "New card" : `Spotted ${info.rate}%`));
+    $("cardTip").style.setProperty("--pack-hue", hueOf(info.pack ?? ""));
+    $("cardTip").replaceChildren(head, el("span", "play-card-art"), el("span", "play-card-text", cell.dataset.note || "No special rules. If you see it, count it."), foot);
+}
 
 function setUpCardTips() {
     const card = $("bingoCard");
@@ -1005,17 +1033,25 @@ function setUpCardTips() {
     const hide = () => {
         clearTimeout(timer);
         tip.hidden = true;
+        shown = null;
     };
-    const showAt = (cell, x, y) => {
-        tip.replaceChildren(el("strong", "", cell.querySelector(".cell-text").textContent), el("span", "", cell.dataset.note));
-        tip.hidden = false;
+    let shown = null;          // The square whose card is open
+    const place = (x, y) => {
         const { width, height } = tip.getBoundingClientRect();
         tip.style.left = `${Math.min(Math.max(8, x - width / 2), innerWidth - width - 8)}px`;
-        tip.style.top = `${y - height - 14 < 8 ? y + 18 : y - height - 14}px`; // Above the pointer, or below near the top
+        // Above the pointer, or below it near the top, and always on screen
+        const above = y - height - 14;
+        tip.style.top = `${Math.max(8, above >= 8 ? above : Math.min(y + 18, innerHeight - height - 8))}px`;
+    };
+    const showAt = (cell, x, y) => {
+        if (shown !== cell) playCard(cell);
+        shown = cell;
+        tip.hidden = false;
+        place(x, y);
     };
 
     card.addEventListener("pointerover", event => {
-        const cell = event.target.closest(".has-note");
+        const cell = event.target.closest(square);
         if (event.pointerType !== "mouse" || !cell) return;
         clearTimeout(timer);
         mouse = { x: event.clientX, y: event.clientY };
@@ -1024,7 +1060,7 @@ function setUpCardTips() {
     card.addEventListener("pointermove", event => {
         if (event.pointerType === "mouse") {
             mouse = { x: event.clientX, y: event.clientY };
-            const cell = event.target.closest(".has-note");
+            const cell = event.target.closest(square);
             if (cell && !tip.hidden) showAt(cell, mouse.x, mouse.y);
         } else if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
             clearTimeout(timer);
@@ -1032,10 +1068,10 @@ function setUpCardTips() {
         }
     });
     card.addEventListener("pointerout", event => {
-        if (event.pointerType === "mouse" && event.target.closest(".has-note")) hide();
+        if (event.pointerType === "mouse" && event.target.closest(square)) hide();
     });
     card.addEventListener("pointerdown", event => {
-        const cell = event.target.closest(".has-note");
+        const cell = event.target.closest(square);
         if (event.pointerType === "mouse" || !cell) return;
         start = { x: event.clientX, y: event.clientY };
         timer = setTimeout(() => {
@@ -1052,9 +1088,11 @@ function setUpCardTips() {
     }
     // Capturing, so the square's own click (which marks it) never runs
     card.addEventListener("click", event => {
-        if (!swallowClick) return;
-        swallowClick = false;
-        event.stopPropagation();
+        if (swallowClick) {
+            swallowClick = false;
+            return event.stopPropagation();
+        }
+        if (shown) setTimeout(() => shown && playCard(shown)); // Counting with it open: show the new count
     }, true);
     // The next touch anywhere closes it
     document.addEventListener("pointerdown", event => {

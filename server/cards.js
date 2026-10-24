@@ -18,8 +18,14 @@ function packProblem({ name, description }, ignoreId) {
 }
 
 // What players need: the packs to pick from and the words on the cards (no stats)
+// rate: how often it's spotted when dealt, as a percentage, once it's been dealt 10 times
 cards.get("/api/cards", signedIn, (req, res) => {
-    res.json({ packs: packList(), cards: store.cards.map(({ id, text, description, pack }) => ({ id, text, description, pack })) });
+    res.json({
+        packs: packList(),
+        cards: store.cards.map(({ id, text, description, pack, dealt, spotted }) => ({
+            id, text, description, pack, rate: dealt >= 10 ? Math.round(spotted / dealt * 100) : null
+        }))
+    });
 });
 
 cards.get("/api/admin/cards", adminOnly, (req, res) => res.json({ packs: packList(), cards: store.cards }));

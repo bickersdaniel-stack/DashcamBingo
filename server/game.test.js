@@ -37,3 +37,25 @@ test("countCoin stops at the daily cap and starts again the next day", () => {
     assert.equal(countCoin(row, "2026-10-25"), 1);
     assert.equal(row.coinsToday, 1);
 });
+
+test("rankPlayers lists winners most first, shares places on a tie, and leaves out the blocked and winless", async () => {
+    const { rankPlayers } = await import("./leaderboard.js");
+    const rows = rankPlayers({
+        a: { name: "Ann", wins: 5 }, b: { name: "Bob", wins: 3 }, c: { name: "Cat", wins: 3 },
+        d: { name: "Dan", wins: 1 }, e: { name: "Eve", wins: 0 }, f: { name: "Fay", wins: 9, blocked: true }
+    });
+    assert.deepEqual(rows.map(r => [r.name, r.rank]), [["Ann", 1], ["Bob", 2], ["Cat", 2], ["Dan", 4]]);
+});
+
+test("rankCards ranks cards with enough games by spotted rate and flags the least spotted as rare", async () => {
+    const { rankCards } = await import("./leaderboard.js");
+    const packs = [{ id: "core", name: "Core" }];
+    const cards = Array.from({ length: 8 }, (_, i) => ({ id: `c${i}`, text: `Card ${i}`, pack: "core", dealt: 20, spotted: 20 - i * 2, counted: i }));
+    cards.push({ id: "new", text: "New card", pack: "core", dealt: 3, spotted: 1 });
+    const rows = rankCards(cards, packs);
+    assert.deepEqual(rows.slice(0, 2).map(r => [r.id, r.rate]), [["c0", 100], ["c1", 90]]);
+    assert.equal(rows.at(-1).id, "new", "too few games go last");
+    assert.equal(rows.at(-1).rate, null);
+    assert.deepEqual(rows.filter(r => r.rare).map(r => r.id), ["c3", "c4", "c5", "c6", "c7"]);
+    assert.equal(rows[0].pack, "Core");
+});

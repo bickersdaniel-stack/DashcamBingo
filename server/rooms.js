@@ -76,9 +76,9 @@ export function setupRooms(io) {
             if (!change) return;
 
             let gained = change.coin ? earnCountCoin(user.id) : 0;
+            countSpot(card.ids[index], change.marked ? 1 : change.unmarked ? -1 : 0, delta);
             if (delta > 0) spot(io, room, player, card.phrases[index]); // Each sighting can show in the feed
             if (change.marked) {
-                countSpot(card.ids[index], 1);
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
                     if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
@@ -90,7 +90,6 @@ export function setupRooms(io) {
                     addEvent(io, room, { type: "win", userId: user.id, lines });
                 }
             } else if (change.unmarked) {
-                countSpot(card.ids[index], -1);
                 unspot(io, room, player, card.phrases[index]);
                 if (card.bestLines > 0 && countLines(card.marked) === 0) unwin(io, room, player, card);
             }

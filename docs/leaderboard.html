@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard · Dashcam Bingo</title>
+    <script>
+        // Apply the saved theme before the page draws, so it doesn't flash the wrong colours
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem("dashcamBingo.theme"); } catch (e) {}
+            const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.theme = dark ? "dark" : "light";
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="bar-side">
+            <a class="pill together-link" href="/" aria-label="Back to rooms">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                <span class="together-label">Back to rooms</span>
+            </a>
+        </div>
+        <h1 class="bar-title">Dashcam Bingo</h1>
+        <div class="bar-side"></div>
+    </header>
+
+    <main class="panel-page">
+        <h2>Leaderboard</h2>
+        <div class="tabs" role="tablist">
+            <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="playersPanel">Players</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="cardsPanel">Cards</button>
+        </div>
+        <p class="email-message error" id="boardMessage" role="status" hidden></p>
+
+        <section class="admin-panel" id="playersPanel" role="tabpanel">
+            <p class="admin-hint">Most bingos across every room.</p>
+            <ol class="item-list board-list" id="playerBoard"></ol>
+            <ol class="item-list board-list board-me" id="myPlace" hidden></ol>
+        </section>
+
+        <section class="admin-panel" id="cardsPanel" role="tabpanel" hidden>
+            <p class="admin-hint">How often each square gets spotted when it's on someone's card. The least spotted are rare sightings.</p>
+            <ol class="item-list board-list" id="cardBoard"></ol>
+        </section>
+    </main>
+
+    <script type="module" src="/leaderboard.js"></script>
+</body>
+</html>

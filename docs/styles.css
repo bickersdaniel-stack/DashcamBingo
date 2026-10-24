@@ -1541,6 +1541,7 @@ body.in-room .stage {
     .room-grid > [gs-id="players"] { order: 4; }
     .room-grid > [gs-id="feed"] { order: 5; }
     .room-grid > [gs-id="wins"] { order: 6; }
+    .room-grid > [gs-id="leaderboard"] { order: 7; }
     .room-grid > .grid-stack-item > .ui-resizable-handle, .widget-grip, .layout-presets {
         display: none !important;
     }
@@ -1899,25 +1900,25 @@ body.in-room .stage {
     white-space: pre-line;
 }
 
-/* Admin page: suggestions, every card, and packs */
-.admin {
+/* Pages like the admin page and leaderboard: a heading, tabs and long lists */
+.panel-page {
     width: 100%;
     max-width: 80rem;
     margin: 0 auto;
     padding: 32px 16px 48px;
     box-sizing: border-box;
 }
-.admin h2 {
+.panel-page h2 {
     margin: 0 0 12px;
     font-size: 22px;
     font-weight: 800;
     color: var(--heading);
 }
-.admin .tabs {
+.panel-page .tabs {
     margin-bottom: 16px;
     padding: 0;
 }
-.admin .item-list {
+.panel-page .item-list {
     max-height: none;
     overflow: visible;
 }
@@ -1985,6 +1986,78 @@ body.in-room .stage {
 .check-label input {
     accent-color: var(--stamp);
 }
+/* Leaderboard rows (page and room tile): place, who or what, and the score */
+.board-row {
+    flex-wrap: nowrap;
+    gap: 10px;
+}
+.board-row .avatar {
+    flex: none;
+    width: 28px;
+    height: 28px;
+}
+.board-row.me {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.board-rank {
+    flex: none;
+    min-width: 2.2em;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+.board-rank.gold {
+    color: var(--amber);
+}
+.board-rank.silver, .board-rank.bronze {
+    color: var(--heading);
+}
+.board-card {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.board-score {
+    flex: none;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--heading);
+    white-space: nowrap;
+}
+.board-bar {
+    flex: 0 0 80px;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--stamp) var(--rate), var(--surface-4) var(--rate));
+}
+.user-tag.tag-rare {
+    flex: none;
+    color: var(--amber);
+}
+.board-me {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-strong);
+}
+.board-body {
+    padding: 0 10px 10px;
+}
+.board-body .board-row {
+    padding: 6px 8px;
+}
+.board-body .board-bar {
+    display: none;
+}
+.board-more {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+}
 .pager {
     display: flex;
     align-items: center;
@@ -2031,7 +2104,7 @@ body.in-room .stage {
 /* On a big enough screen the admin page fits the window: the heading, tabs, tools and page buttons stay put
    and only the list scrolls. Phones scroll the whole page instead, since the tools take most of the height */
 @media (min-width: 700px) and (min-height: 560px) {
-    .admin {
+    .panel-page {
         display: flex;
         flex-direction: column;
         height: calc(100vh - 64px);
@@ -2044,7 +2117,7 @@ body.in-room .stage {
         flex: 1;
         min-height: 0;
     }
-    .admin .item-list {
+    .panel-page .item-list {
         flex: 1;
         min-height: 0;
         overflow-y: auto;

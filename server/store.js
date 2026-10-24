@@ -34,11 +34,13 @@ export function migrate(data, lines) {
 export const cardsIn = packIds => store.cards.filter(card => packIds.includes(card.pack));
 export const defaultPacks = () => store.packs.filter(pack => pack.on).map(pack => pack.id);
 
-// How often each card gets marked, for the admin page and for dealing a fair mix; unmarking takes it back off
-export function countSpot(cardId, by) {
+// How often each card gets marked (spotted, for the admin page and dealing a fair mix) and every sighting
+// counted on it (counted, for the leaderboard); taking one off takes it back off
+export function countSpot(cardId, spotted, counted) {
     const card = store.cards.find(card => card.id === cardId);
     if (!card) return;
-    card.spotted = Math.max(0, card.spotted + by);
+    card.spotted = Math.max(0, card.spotted + spotted);
+    card.counted = Math.max(0, (card.counted ?? 0) + counted);
     save();
 }
 

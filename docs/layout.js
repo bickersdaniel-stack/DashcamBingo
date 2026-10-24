@@ -7,20 +7,20 @@ import { load, save } from "./core.js";
 const $ = id => document.getElementById(id);
 const rows = 12;      // The built-in layouts are this many rows tall, and rows are sized so that fits the window
 const narrowPx = 900; // Below this width the tiles stack
-const names = { video: "Video", host: "Host controls", players: "Players", feed: "Feed", wins: "Winning cards" };
+const names = { video: "Video", host: "Host controls", players: "Players", feed: "Feed", wins: "Winning cards", leaderboard: "Leaderboard" };
 
 // Places on a 12-column grid. Hidden tiles keep a place for when they're shown again
 const at = (x, y, w, h) => ({ x, y, w, h });
 export const presets = {
     video: {
-        Default: { items: { video: at(0, 0, 8, 12), players: at(8, 0, 4, 2), card: at(8, 2, 4, 8), feed: at(8, 10, 4, 2), wins: at(8, 12, 4, 4) }, hidden: ["wins"] },
-        Focus: { items: { video: at(0, 0, 9, 12), card: at(9, 0, 3, 6), feed: at(9, 6, 3, 6), players: at(9, 12, 3, 3), wins: at(9, 15, 3, 4) }, hidden: ["players", "wins"] },
-        "Three columns": { items: { players: at(0, 0, 2, 4), feed: at(0, 4, 2, 8), video: at(2, 0, 7, 12), card: at(9, 0, 3, 12), wins: at(9, 12, 3, 4) }, hidden: ["wins"] }
+        Default: { items: { video: at(0, 0, 8, 12), players: at(8, 0, 4, 2), card: at(8, 2, 4, 8), feed: at(8, 10, 4, 2), wins: at(8, 12, 4, 4), leaderboard: at(8, 16, 4, 5) }, hidden: ["wins", "leaderboard"] },
+        Focus: { items: { video: at(0, 0, 9, 12), card: at(9, 0, 3, 6), feed: at(9, 6, 3, 6), players: at(9, 12, 3, 3), wins: at(9, 15, 3, 4), leaderboard: at(9, 19, 3, 5) }, hidden: ["players", "wins", "leaderboard"] },
+        "Three columns": { items: { players: at(0, 0, 2, 4), feed: at(0, 4, 2, 8), video: at(2, 0, 7, 12), card: at(9, 0, 3, 12), wins: at(9, 12, 3, 4), leaderboard: at(9, 16, 3, 5) }, hidden: ["wins", "leaderboard"] }
     },
     plain: {
-        Default: { items: { card: at(0, 0, 8, 12), players: at(8, 0, 4, 4), feed: at(8, 4, 4, 8), wins: at(8, 12, 4, 4), video: at(0, 12, 8, 8) }, hidden: ["wins"] },
-        Focus: { items: { card: at(0, 0, 9, 12), feed: at(9, 0, 3, 12), players: at(9, 12, 3, 4), wins: at(9, 16, 3, 4), video: at(0, 12, 9, 8) }, hidden: ["players", "wins"] },
-        "Three columns": { items: { players: at(0, 0, 3, 12), card: at(3, 0, 6, 12), feed: at(9, 0, 3, 12), wins: at(9, 12, 3, 4), video: at(3, 12, 6, 8) }, hidden: ["wins"] }
+        Default: { items: { card: at(0, 0, 8, 12), players: at(8, 0, 4, 4), feed: at(8, 4, 4, 8), wins: at(8, 12, 4, 4), leaderboard: at(8, 16, 4, 5), video: at(0, 12, 8, 8) }, hidden: ["wins", "leaderboard"] },
+        Focus: { items: { card: at(0, 0, 9, 12), feed: at(9, 0, 3, 12), players: at(9, 12, 3, 4), wins: at(9, 16, 3, 4), leaderboard: at(9, 20, 3, 5), video: at(0, 12, 9, 8) }, hidden: ["players", "wins", "leaderboard"] },
+        "Three columns": { items: { players: at(0, 0, 3, 12), card: at(3, 0, 6, 12), feed: at(9, 0, 3, 12), wins: at(9, 12, 3, 4), leaderboard: at(9, 16, 3, 5), video: at(3, 12, 6, 8) }, hidden: ["wins", "leaderboard"] }
     }
 };
 
@@ -88,7 +88,10 @@ function layoutFor() {
     const fallback = builtIn().Default;
     let kept = null;
     try { kept = JSON.parse(load(key())); } catch (e) {}
-    return { items: { ...fallback.items, ...kept?.items }, hidden: Array.isArray(kept?.hidden) ? kept.hidden : fallback.hidden };
+    if (!Array.isArray(kept?.hidden)) return fallback;
+    // A tile added since this layout was saved starts out the way the default has it
+    const added = fallback.hidden.filter(id => !(id in (kept.items ?? {})));
+    return { items: { ...fallback.items, ...kept.items }, hidden: [...kept.hidden, ...added] };
 }
 
 // Takes every tile off and puts the shown ones back top-left first, so none is pushed aside by a tile

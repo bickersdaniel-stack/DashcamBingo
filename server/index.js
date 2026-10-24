@@ -10,6 +10,7 @@ import { cards } from "./cards.js";
 import { cardsIn, defaultPacks, store } from "./store.js";
 import { suggestions } from "./suggestions.js";
 import { users } from "./users.js";
+import { leaderboard } from "./leaderboard.js";
 import { setupRooms } from "./rooms.js";
 
 for (const key of ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SESSION_SECRET", "PUBLIC_URL"]) {
@@ -40,6 +41,7 @@ app.use(auth);
 app.use(suggestions);
 app.use(cards);
 app.use(users);
+app.use(leaderboard);
 app.get("/healthz", (req, res) => res.send("ok"));
 // The solo game here deals from the packs that are on by default (or every card, if they hold too few for a card)
 app.get("/phrases.txt", (req, res) => {
@@ -50,10 +52,11 @@ app.get("/phrases.txt", (req, res) => {
 // (Cloudflare tells browsers to keep .js and .css for 4 hours, whatever this server says)
 const page = file => async (req, res) => {
     const html = await readFile(`${docs}/${file}`, "utf8");
-    res.type("html").send(html.replace(/(href|src)="\/?(styles\.css|room\.js|app\.js|admin\.js)"/g, `$1="/v/${version}/$2"`));
+    res.type("html").send(html.replace(/(href|src)="\/?(styles\.css|room\.js|app\.js|admin\.js|leaderboard\.js)"/g, `$1="/v/${version}/$2"`));
 };
 app.get(["/", "/r/:code"], page("room.html"));
 app.get("/admin", (req, res, next) => isAdmin(req.session.user) ? next() : res.redirect("/"), page("admin.html"));
+app.get("/leaderboard", page("leaderboard.html"));
 app.get(["/solo", "/index.html"], page("index.html")); // The solo game, sharing this site's theme and colour
 app.get("/privacy", page("privacy.html"));
 const site = express.static(docs, { index: false }); // Only docs/ is public, never server code or .env

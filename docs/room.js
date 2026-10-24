@@ -1,6 +1,7 @@
 // Together mode: sign in (Discord, Google or an email link), then rooms where everyone's marks and wins show up live
 import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
+import { cardRow, playerRow } from "./board.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -143,6 +144,7 @@ function joinRoom() {
         showRoom(socket);
         // A new round while you're here: show how the last one went (not after a refresh or rejoin)
         if (previousRound && state.round.number > previousRound && state.lastRound) showScoreboard(state.lastRound);
+        if (state.round.number !== previousRound) showMiniBoard(); // Wins may have changed
     });
     socket.on("room:gone", message => leaveRoomView(socket, message)); // The host ended it, or you left in another tab
     socket.on("player:left", id => {
@@ -182,6 +184,7 @@ function joinRoom() {
         else state.events[i] = event; // Someone else spotted the same thing
         showFeed();
         if (event.type === "spot" && !(event.cleared ?? []).length) pulse(event);
+        if (event.type === "win") showMiniBoard(); // A bingo (or one taken back) changes the wins
     });
     socket.on("video:update", video => {
         if (!state) return;
@@ -663,6 +666,17 @@ function videoSecondsNow() {
 
 function showMyWins(n) {
     $("myWins").textContent = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
+}
+
+// The Leaderboard tile: the top five players and most spotted squares
+async function showMiniBoard() {
+    const { ok, data } = await api("GET", "/api/leaderboard");
+    if (!ok) return;
+    const none = text => el("li", "item empty", text);
+    const players = data.players.slice(0, 5).map(player => playerRow(player, player.id === data.me?.id));
+    const cards = data.cards.filter(card => card.rate !== null).slice(0, 5).map((card, i) => cardRow(card, i + 1));
+    $("miniPlayers").replaceChildren(...(players.length ? players : [none("Nobody has a bingo yet.")]));
+    $("miniCards").replaceChildren(...(cards.length ? cards : [none("Not enough games yet.")]));
 }
 
 function showMyCoins(n) {

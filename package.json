@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "PORT=3300 PUBLIC_URL=http://localhost:3300 node --env-file=.env --watch server/index.js",
-    "test": "node --test server/*.test.js"
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "DATA_DIR=data-dev PORT=3300 PUBLIC_URL=http://localhost:3300 node --disable-warning=ExperimentalWarning --env-file=.env --watch server/index.js",
+    "dev:copy-live": "node --disable-warning=ExperimentalWarning server/copy-live.js",
+    "test": "DATA_DIR=:memory: node --disable-warning=ExperimentalWarning --test server/*.test.js"
   },
   "engines": {
     "node": ">=22"

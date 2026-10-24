@@ -1,7 +1,9 @@
-// Admin page: review suggested squares, edit every card and its description, sort cards into packs, and manage people
+// Admin page: review suggested squares, edit every card and its description, sort cards into packs, manage people,
+// and set how many coins players earn
 const $ = id => document.getElementById(id);
 const pageSize = 25;
 const pages = { card: 1, user: 1 }; // The page each long list is on
+const coinKeys = ["bingoCoins", "coinsPerRound", "countCoinsPerDay"]; // Also the ids of their inputs
 let packs = [];
 let cards = [];
 let users = [];
@@ -33,9 +35,19 @@ $("newPackForm").addEventListener("submit", async event => {
     load();
 });
 
+showSaveWhenEdited($("coinsForm"), $("coinsSave"));
+$("coinsForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = await api("PATCH", "/api/admin/settings", Object.fromEntries(coinKeys.map(key => [key, $(key).valueAsNumber])));
+    if (done(result, "Saved.")) load();
+});
+
 async function load() {
-    const [all, waiting, people] = await Promise.all([api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users")]);
+    const [all, waiting, people, settings] = await Promise.all([
+        api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users"), api("GET", "/api/admin/settings")
+    ]);
     if (!all.ok) return message(all.data.error, false);
+    if (!people.ok) return message(people.data.error, false);
     ({ packs, cards } = all.data);
     users = people.data;
     fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
@@ -46,6 +58,7 @@ async function load() {
     showCards();
     showPacks();
     showUsers();
+    showCoins(settings.data);
     return waiting.data.pending?.length ?? 0;
 }
 
@@ -90,11 +103,24 @@ function showCards() {
         const text = input(card.text, 60, "Card wording");
         const description = textarea(card.description, "Description (optional)");
         const pack = fillPackSelect(el("select", "quality-select pack-select"), card.pack);
-        const r = rate(card);
-        const stats = el("span", "admin-stats", r === null ? "Not enough games yet" : `Spotted ${Math.round(r * 100)}%`);
-        stats.title = `Marked on ${card.spotted} of the ${card.dealt} cards it was dealt on`;
+        const counted = Object.assign(input(String(card.counted ?? 0), 6, `Counted for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const spotted = Object.assign(input(String(card.spotted ?? 0), 6, `Marked deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const dealt = Object.assign(input(String(card.dealt ?? 0), 6, `Deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        counted.classList.add("wins-input");
+        spotted.classList.add("wins-input");
+        dealt.classList.add("wins-input");
+        const stats = el("span", "admin-counts");
+        const countedLabel = el("label", "check-label", "Counted ");
+        const markedLabel = el("label", "check-label", "Marked ");
+        countedLabel.append(counted);
+        markedLabel.append(spotted, " / ", dealt);
+        stats.append(countedLabel, markedLabel);
+        stats.title = "Counted is every sighting. Marked / dealt is how often it was on a card and got marked.";
         const save = button("Save", "btn btn-primary", async () => {
-            const result = await api("PATCH", `/api/admin/cards/${card.id}`, { text: text.value, description: description.value, pack: pack.value });
+            const result = await api("PATCH", `/api/admin/cards/${card.id}`, {
+                text: text.value, description: description.value, pack: pack.value,
+                counted: Number(counted.value), spotted: Number(spotted.value), dealt: Number(dealt.value)
+            });
             if (done(result, "Saved.")) load();
         });
         const remove = button("Delete", "link-button", async () => {
@@ -143,7 +169,7 @@ function showUsers() {
             if (done(await api("PATCH", `/api/admin/users/${encodeURIComponent(user.id)}`, body), text)) load();
         };
         const who = el("span", "user-who");
-        const seen = user.seenAt ? `last played ${new Date(user.seenAt).toLocaleDateString()}` : "not played since this update";
+        const seen = user.seenAt ? `last seen ${new Date(user.seenAt).toLocaleDateString()}` : "not seen since this update";
         who.append(el("strong", "", user.name), el("span", "item-by", `${signedInWith[user.via]} · ${seen}`));
         const tags = [user.owner ? "Owner" : user.admin && "Admin", user.blocked && "Blocked"].filter(Boolean);
         const wins = Object.assign(input(String(user.wins), 6, `Wins for ${user.name}`), { type: "number", min: 0, max: 100000 });
@@ -172,6 +198,11 @@ function showUsers() {
         }
         return item;
     }));
+}
+
+function showCoins(settings) {
+    for (const key of coinKeys) $(key).value = settings[key];
+    $("coinsSave").style.visibility = "hidden"; // Until one is edited again
 }
 
 // One page of a long list; the page stays in range when the list gets shorter

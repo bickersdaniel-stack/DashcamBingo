@@ -1,20 +1,22 @@
 // Rooms, rounds, cards, marks and wins. All held in memory, so a restart ends every room.
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
-import { skinInfo } from "./shop.js";
-import { addCoins, addWin, cardsIn, coinsOf, countSpot, defaultPacks, earnCountCoin, isBlocked, removeWin, save, store, touchProfile } from "./store.js";
+import { lookOf, reactionsOf, skinInfo, wornExtra } from "./shop.js";
+import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, packTable, removeWin, touchProfile, updateProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
 const spotMergeMs = 30 * 1000;
 const spotGapMs = 1000;
+const reactGapMs = 300;
+const maxReactions = 8; // Different emojis on one feed item
 const emptyRoomMs = 6 * 60 * 60 * 1000;
 const handoverMs = 60 * 1000;
 const maxVideoSeconds = 10_000_000; // Room for long live streams
 const videoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const rooms = new Map();
-const bingoCoins = 25;
 const maxCount = 99;
+const keptRounds = 4; // Finished rounds the feed still shows, newest first
 let roomsIo = null; // Kept so changes from the admin page reach rooms in progress
 
 export function setupRooms(io) {
@@ -77,7 +79,8 @@ export function setupRooms(io) {
             const change = applyCount(card, index, delta);
             if (!change) return;
 
-            let gained = change.coin ? earnCountCoin(user.id) : 0;
+            let gained = change.coin && coinsLeft(card) > 0 ? earnCountCoin(user.id) : 0;
+            card.coinsEarned += gained;
             const phrase = card.phrases[index];
             countSpot(card.ids[index], change.marked ? 1 : change.unmarked ? -1 : 0, delta);
             const first = delta > 0 && spot(io, room, player, phrase); // Each sighting can show in the feed
@@ -85,14 +88,18 @@ export function setupRooms(io) {
             if (change.marked) {
                 const lines = countLines(card.marked);
                 if (lines > card.bestLines) {
+                    const win = { type: "win", userId: user.id, lines };
                     if (card.bestLines === 0) { // One win per round, for the first line; kept on their profile
+                        const { id, pieces } = wornExtra(getProfile(user.id) ?? {}, "celebration") ?? {};
+                        if (id) win.celebration = { id, pieces };
                         player.wins = addWin(user.id);
-                        addCoins(user.id, bingoCoins);
-                        gained += bingoCoins;
+                        const paid = payBingo(card);
+                        addCoins(user.id, paid);
+                        gained += paid;
                         moment.bingoMs = Date.now() - room.round.startedAt;
                     }
                     card.bestLines = lines;
-                    addEvent(io, room, { type: "win", userId: user.id, lines });
+                    addEvent(io, room, win);
                 }
             } else if (change.unmarked) {
                 unspot(io, room, player, card.phrases[index]);
@@ -105,6 +112,18 @@ export function setupRooms(io) {
             }, moment);
             io.to(room.code).emit("player:update", playerInfo(room, player));
             if (typeof reply === "function") reply({ gained, coins: coinsOf(user.id) });
+        });
+
+        // An emoji on a feed item, or taking yours back off. Sent on its own so it doesn't look like a new sighting
+        socket.on("event:react", data => {
+            const room = rooms.get(socket.data.code);
+            const player = room?.players.get(user.id);
+            if (!player || Date.now() - (player.lastReactAt ?? 0) < reactGapMs) return;
+            player.lastReactAt = Date.now();
+            const event = room.round.events.find(e => e.id === data?.eventId);
+            if (react(event, user.id, data?.emoji, reactionsOf(getProfile(user.id) ?? {}))) {
+                io.to(room.code).emit("event:reactions", { id: event.id, reactions: event.reactions });
+            }
         });
 
         // A new round, with the host's YouTube video if they gave one
@@ -145,7 +164,7 @@ export function setupRooms(io) {
             const room = rooms.get(socket.data.code);
             const card = room?.round.cards.get(user.id);
             if (!room || data?.round !== room.round.id || !canReroll(room, card)) return;
-            room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1 }));
+            room.round.cards.set(user.id, Object.assign(dealCard(room), { rerollsUsed: card.rerollsUsed + 1, coinsEarned: card.coinsEarned }));
             progress(io, room, user.id, { rerolls: 1 });
             socket.emit("room:state", stateFor(room, user.id));
             io.to(room.code).emit("player:update", playerInfo(room, room.players.get(user.id)));
@@ -275,12 +294,12 @@ export function kickUser(userId) {
     }
 }
 
-// An admin changed someone's wins: rooms they're in show the new count
+// An admin changed someone's wins, or they put on a frame or title: rooms they're in show it
 export function refreshPlayer(userId) {
     for (const room of rooms.values()) {
         const player = room.players.get(userId);
         if (!player) continue;
-        player.wins = store.profiles[userId]?.wins ?? player.wins;
+        player.wins = getProfile(userId)?.wins ?? player.wins;
         roomsIo.to(room.code).emit("player:update", playerInfo(room, player));
     }
 }
@@ -289,6 +308,8 @@ export function refreshPlayer(userId) {
 function startRound(room, video = null, replace = false) {
     video = continueVideo(room.round?.video, video); // Same dashcam clip, next bingo: keep watching from here
     const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
+    // The round that's ending stays in the feed under its number (a replaced round had nothing in it)
+    if (room.round && !replace) room.pastRounds = [{ number: room.round.number, events: room.round.events }, ...(room.pastRounds ?? [])].slice(0, keptRounds);
     room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard(room));
 }
@@ -297,16 +318,33 @@ function startRound(room, video = null, replace = false) {
 // mid-round doesn't change squares people are looking at; each card counts as dealt for the stats
 function dealCard(room) {
     const deck = cardsIn(room.packs);
-    const picked = pickCards(deck.length >= 24 ? deck : store.cards); // A pack was emptied or deleted mid-room
-    for (const card of picked) card.dealt++;
-    save();
+    const picked = pickCards(deck.length >= 24 ? deck : cardTable.all()); // A pack was emptied or deleted mid-room
+    markDealt(picked.map(card => card.id));
     picked.splice(12, 0, null);
     return {
         ids: picked.map(card => card?.id ?? null),
         phrases: picked.map(card => card?.text ?? "FREE"),
         notes: picked.map(card => card?.description ?? ""),
-        counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set(), bestLines: 0, rerollsUsed: 0
+        counts: Array(25).fill(0), peak: Array(25).fill(0), marked: new Set(), bestLines: 0, rerollsUsed: 0,
+        coinsEarned: 0, bingoPaid: 0
     };
+}
+
+// What a card can still earn this round; 0, not less, if an admin lowered the cap mid-round
+export const coinsLeft = card => Math.max(0, coinSettings().coinsPerRound - card.coinsEarned);
+
+// A BINGO pays what fits under the round's cap, kept so unwinning takes back exactly that
+export function payBingo(card) {
+    card.bingoPaid = Math.min(coinSettings().bingoCoins, coinsLeft(card));
+    card.coinsEarned += card.bingoPaid;
+    return card.bingoPaid;
+}
+
+export function refundBingo(card) {
+    const paid = card.bingoPaid;
+    card.coinsEarned -= paid;
+    card.bingoPaid = 0;
+    return paid;
 }
 
 // One more or one fewer sighting on a square (never below 0 or above 99). Says what changed: whether the square
@@ -346,7 +384,7 @@ function shuffle(list, random = Math.random) {
 // The packs a host picked, if they exist and hold enough cards to fill a card
 export function packsFrom(value) {
     if (!Array.isArray(value)) return null;
-    const ids = [...new Set(value)].filter(id => store.packs.some(pack => pack.id === id));
+    const ids = [...new Set(value)].filter(id => typeof id === "string" && packTable.get(id));
     return cardsIn(ids).length >= 24 ? ids : null;
 }
 
@@ -376,16 +414,30 @@ function spot(io, room, player, phrase) {
     io.to(room.code).emit("event", recent);
 }
 
+// Puts someone's emoji on a feed item (a spot, win or achievement), or takes it off if it's there. Returns whether
+// anything changed
+export function react(event, userId, emoji, allowed) {
+    if (!["spot", "win", "achievement"].includes(event?.type) || !allowed.includes(emoji)) return false;
+    const reactions = event.reactions ??= {};
+    const who = reactions[emoji] ?? [];
+    if (who.includes(userId)) {
+        if (who.length === 1) delete reactions[emoji];
+        else reactions[emoji] = who.filter(id => id !== userId);
+    } else {
+        if (!who.length && Object.keys(reactions).length >= maxReactions) return false;
+        reactions[emoji] = [...who, userId];
+    }
+    return true;
+}
+
 // Adds to someone's lifetime stats, and tells them (with a pop-up) and the room (in the feed) about anything that unlocks
 function progress(io, room, userId, changes, moment) {
-    const profile = store.profiles[userId] ??= { wins: 0 };
-    const earned = recordProgress(profile, changes, moment);
-    save();
+    const { earned, coins } = updateProfile(userId, profile => ({ earned: recordProgress(profile, changes, moment), coins: profile.coins }));
     for (const a of earned) {
         addEvent(io, room, { type: "achievement", userId, name: a.name });
         for (const other of io.sockets.sockets.values()) {
             if (other.data.userId === userId && other.data.code === room.code) {
-                other.emit("achievement", { name: a.name, description: a.description, coins: a.coins, total: profile.coins });
+                other.emit("achievement", { name: a.name, description: a.description, coins: a.coins, total: coins });
             }
         }
     }
@@ -402,7 +454,7 @@ function unspot(io, room, player, phrase) {
 // Unmarking until no line is left takes back this round's BINGO and the win on their profile
 function unwin(io, room, player, card) {
     player.wins = removeWin(player.id);
-    addCoins(player.id, -bingoCoins);
+    addCoins(player.id, -refundBingo(card));
     card.bestLines = 0;
     for (const event of room.round.events) {
         if (event.type !== "win" || event.userId !== player.id || event.undone) continue;
@@ -425,7 +477,7 @@ function addEvent(io, room, event) {
 function playerInfo(room, player) {
     const card = room.round.cards.get(player.id);
     return {
-        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins,
+        id: player.id, name: player.name, avatar: player.avatar, wins: player.wins, ...lookOf(getProfile(player.id) ?? {}),
         connected: room.connections.get(player.id) > 0,
         marked: card ? card.marked.size : 0,
         oneAway: card ? isOneAway(card.marked) : false
@@ -435,15 +487,18 @@ function playerInfo(room, player) {
 // Everything one player needs, including their own card (nobody else's)
 function stateFor(room, userId) {
     const card = room.round.cards.get(userId);
+    const profile = getProfile(userId) ?? {};
     return {
         code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0, packs: room.packs,
+        reactions: reactionsOf(profile), stamp: wornExtra(profile, "stamp")?.id ?? null, // Only you see your stamp
         round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
         lastRound: room.lastRound,
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),
         events: room.round.events,
+        pastRounds: room.pastRounds ?? [],
         // skins: your own equipped skin on each square (nobody else sees them)
-        card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(store.profiles[userId]?.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
+        card: { ids: card.ids, skins: card.ids.map(id => id && skinInfo(profile.skins?.[id]?.equipped)), phrases: card.phrases, notes: card.notes, counts: card.counts, bestLines: card.bestLines, rerollsUsed: card.rerollsUsed ?? 0 }
     };
 }
 

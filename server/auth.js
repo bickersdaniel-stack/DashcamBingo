@@ -2,7 +2,7 @@
 // are kept; access tokens are thrown away and email addresses are never shown to other players.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
-import { store } from "./store.js";
+import { getProfile, touchProfile } from "./store.js";
 
 const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, PUBLIC_URL, SESSION_SECRET } = process.env;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Dashcam Bingo <bingo@dkb.lol>";
@@ -14,15 +14,19 @@ const linkMinutes = 15;
 export const auth = Router();
 // Owners (ADMIN_IDS in .env) are always admins; other admins are set on the admin page
 export const isOwner = id => adminIds.includes(id);
-export const isAdmin = user => !!user && (isOwner(user.id) || store.profiles[user.id]?.admin === true);
+export const isAdmin = user => !!user && (isOwner(user.id) || getProfile(user.id)?.admin === true);
 
 auth.get("/api/me", (req, res) => {
-    if (req.session.user) return res.json({
-        ...req.session.user, admin: isAdmin(req.session.user),
-        wins: store.profiles[req.session.user.id]?.wins ?? 0,
-        coins: store.profiles[req.session.user.id]?.coins ?? 0,
-        newSkins: store.profiles[req.session.user.id]?.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
-    });
+    if (req.session.user) {
+        // Signed in but never joined a room: still show them on the admin people list
+        const profile = getProfile(req.session.user.id) ?? touchProfile(req.session.user);
+        return res.json({
+            ...req.session.user, admin: isAdmin(req.session.user),
+            wins: profile.wins ?? 0,
+            coins: profile.coins ?? 0,
+            newSkins: profile.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
+        });
+    }
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up
 });
 
@@ -54,7 +58,8 @@ auth.get("/auth/discord/callback", async (req, res) => {
         if (!asked) return res.redirect(`/auth/discord?ask=1${next === "/" ? "" : `&next=${next}`}`);
         return res.redirect(next); // Pressed Cancel on Discord
     }
-    if (!expected || req.query.state !== expected) return res.status(400).send("Sign-in expired. Go back and try again.");
+    // Finished in a browser that didn't start it: back to the room link, to sign in again from there
+    if (!expected || req.query.state !== expected) return next === "/" ? res.status(400).send("Sign-in expired. Go back and try again.") : res.redirect(next);
     try {
         const token = await postForm("https://discord.com/api/oauth2/token", {
             grant_type: "authorization_code", code: req.query.code, redirect_uri: discordRedirect,
@@ -66,6 +71,7 @@ auth.get("/auth/discord/callback", async (req, res) => {
             ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=64`
             : `https://cdn.discordapp.com/embed/avatars/${(BigInt(me.id) >> 22n) % 6n}.png`;
         req.session.user = { id: me.id, name: me.global_name ?? me.username, avatar };
+        touchProfile(req.session.user);
         res.redirect(next);
     } catch (error) {
         console.error(error);
@@ -87,7 +93,8 @@ auth.get("/auth/google", (req, res) => {
 auth.get("/auth/google/callback", async (req, res) => {
     const { expected, next } = takeSignIn(req);
     if (!req.query.code) return res.redirect(next); // Pressed Cancel on Google
-    if (!expected || req.query.state !== expected) return res.status(400).send("Sign-in expired. Go back and try again.");
+    // Finished in a browser that didn't start it: back to the room link, to sign in again from there
+    if (!expected || req.query.state !== expected) return next === "/" ? res.status(400).send("Sign-in expired. Go back and try again.") : res.redirect(next);
     try {
         const token = await postForm("https://oauth2.googleapis.com/token", {
             grant_type: "authorization_code", code: req.query.code, redirect_uri: googleRedirect,
@@ -96,6 +103,7 @@ auth.get("/auth/google/callback", async (req, res) => {
         const me = await getJson("https://openidconnect.googleapis.com/v1/userinfo", token.access_token);
         const name = (me.name || me.given_name || "Google player").slice(0, 32);
         req.session.user = { id: `google:${me.sub}`, name, avatar: me.picture || initialAvatar(name, me.sub) };
+        touchProfile(req.session.user);
         res.redirect(next);
     } catch (error) {
         console.error(error);
@@ -150,17 +158,22 @@ auth.post("/auth/email/finish", express.urlencoded({ extended: false, limit: "2k
     // The id comes from the address but can't be turned back into it, so other players never see emails
     const id = `email:${createHash("sha256").update(data.email).digest("hex").slice(0, 24)}`;
     req.session.user = { id, name: data.name, avatar: initialAvatar(data.name, id) };
+    touchProfile(req.session.user);
     res.redirect(data.next);
 });
 
-// Remembers where to go back to (only ever a room link on this site) and proves the reply belongs to this sign-in
+// Remembers where to go back to (only ever a room link on this site) and proves the reply belongs to this sign-in.
+// The room code also rides on the end of the state, which Discord and Google hand back: on phones the sign-in often
+// finishes in another browser (tapped in a chat app, finished in Chrome) that never saw this session
 function startSignIn(req, next) {
-    req.session.state = randomBytes(16).toString("hex");
-    req.session.next = /^\/r\/[A-Z0-9]{5}$/.test(next) ? next : undefined;
+    const room = /^\/r\/([A-Z0-9]{5})$/.exec(next)?.[1];
+    req.session.state = randomBytes(16).toString("hex") + (room ? `-${room}` : "");
+    req.session.next = room ? next : undefined;
 }
 
 function takeSignIn(req) {
-    const signIn = { expected: req.session.state, next: req.session.next ?? "/" };
+    const room = /-([A-Z0-9]{5})$/.exec(String(req.query.state ?? ""))?.[1];
+    const signIn = { expected: req.session.state, next: req.session.next ?? (room ? `/r/${room}` : "/") };
     delete req.session.state;
     delete req.session.next;
     return signIn;

@@ -1,7 +1,7 @@
 // Achievements: lifetime stats on each profile and the goals they unlock, each worth some coins.
 // Some are just for a laugh; those show a hint until they're earned, rather than giving the game away
 import { Router } from "express";
-import { store } from "./store.js";
+import { getProfile } from "./store.js";
 import { signedIn } from "./suggestions.js";
 
 // stat + goal: counted over a lifetime (and shown as progress). check: something that happens in one moment
@@ -47,7 +47,7 @@ export const achievementRoutes = Router();
 
 // Everything there is to earn, what you've earned, and how far along the rest are
 achievementRoutes.get("/api/me/achievements", signedIn, (req, res) => {
-    const profile = store.profiles[req.session.user.id] ?? {};
+    const profile = getProfile(req.session.user.id) ?? {};
     res.json(achievements.map(a => {
         const earnedAt = profile.achievements?.[a.id] ?? null;
         return {

@@ -555,6 +555,56 @@ body:not(.signed-in) .bar-coins, body.in-room .bar-coins {
     pointer-events: none;
     animation: coin-pop 0.9s ease-out forwards;
 }
+/* Stamps: how a marked square looks on your own card (in place of its skin's pattern), and how it lands */
+.stamped .bingo-cell.crossed:not(.center-cell), .extra-stamp {
+    background-image: var(--stamp-art);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: var(--stamp-size, 60% auto);
+}
+.stamped .bingo-cell.crossed:not(.center-cell) {
+    animation: var(--stamp-in) 0.35s ease-out;
+}
+.extra-stamp {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+}
+.extra-stamp::after {
+    display: none;
+}
+.stamp-big-tick {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M4 12.5l5 5L20 6.5' fill='none' stroke='%23fff' stroke-opacity='.4' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    --stamp-in: stamp-thump;
+}
+.stamp-star {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z' fill='%23fff' fill-opacity='.32'/></svg>");
+    --stamp-in: stamp-spin;
+}
+.stamp-roo-prints {
+    --stamp-art: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff' fill-opacity='.32'><ellipse cx='12' cy='15.5' rx='5' ry='4.5'/><circle cx='5.5' cy='9.5' r='2.2'/><circle cx='9.5' cy='5.8' r='2.2'/><circle cx='14.5' cy='5.8' r='2.2'/><circle cx='18.5' cy='9.5' r='2.2'/></svg>");
+    --stamp-in: stamp-thump;
+}
+.stamp-paint-splat {
+    --stamp-art:
+        radial-gradient(circle at 50% 52%, rgba(255, 255, 255, 0.3) 0 26%, transparent 27%),
+        radial-gradient(circle at 24% 28%, rgba(255, 255, 255, 0.3) 0 9%, transparent 10%),
+        radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.3) 0 7%, transparent 8%),
+        radial-gradient(circle at 74% 80%, rgba(255, 255, 255, 0.3) 0 10%, transparent 11%),
+        radial-gradient(circle at 20% 76%, rgba(255, 255, 255, 0.3) 0 6%, transparent 7%);
+    --stamp-size: 80% 80%;
+    --stamp-in: stamp-splat;
+}
+@keyframes stamp-thump {
+    from { transform: scale(1.18); }
+}
+@keyframes stamp-spin {
+    from { transform: rotate(-20deg) scale(0.85); }
+}
+@keyframes stamp-splat {
+    from { transform: scale(0.6); }
+    60% { transform: scale(1.08); }
+}
 @keyframes coin-pop {
     from { transform: translate(-50%, 0); opacity: 1; }
     to { transform: translate(-50%, -32px); opacity: 0; }
@@ -731,6 +781,9 @@ a.btn {
     font-size: 11px;
     font-weight: 500;
     color: var(--accent);
+}
+.win-tag.plain { /* A round's card without a bingo */
+    color: var(--text-muted);
 }
 .win-card img {
     display: block;
@@ -1300,6 +1353,13 @@ body.in-lobby .code-slots span {
     letter-spacing: 0.15em;
     color: var(--heading);
 }
+.widget-head .logo-mark {
+    width: 1.4em;
+    height: 1.4em;
+}
+.widget-head .round-number:has(+ .now-playing:not([hidden])) {
+    flex: none; /* Now playing takes the room instead */
+}
 .widget-head .round-number {
     flex: 1;
     font-size: 12px;
@@ -1401,6 +1461,66 @@ body.in-lobby .code-slots span {
     border-color: var(--stamp);
     background-color: var(--stamp-ambient);
 }
+/* Each round's items under its number */
+.feed-round {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.feed-round:first-child {
+    margin-top: 0;
+}
+.feed-round::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+}
+/* Emojis on a feed item: a + beside its time, and the ones people put on it underneath */
+.feed-item {
+    flex-wrap: wrap;
+}
+.feed-reactions {
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-left: 38px;
+}
+.reaction {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background-color: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+.reaction:hover:not(:disabled) {
+    border-color: var(--border-strong);
+}
+.reaction:disabled {
+    cursor: default;
+}
+.reaction[aria-pressed="true"] {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.react-add {
+    color: var(--text-faint);
+}
+/* Out of the way until you point at the item; phones always show it */
+@media (hover: hover) {
+    .feed-item:not(:hover, :focus-within) .react-add[aria-expanded="false"] {
+        opacity: 0;
+    }
+}
 .feed-item.undone {
     opacity: 0.65;
 }
@@ -1414,10 +1534,15 @@ body.in-lobby .code-slots span {
     text-align: center;
     color: var(--text-faint);
 }
+/* What the host is playing, in the video tile's title bar; a long title runs out to "…" */
 .now-playing {
-    margin: 0 0 8px;
-    padding: 0 4px;
-    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-muted);
 }
 .now-playing em {
@@ -1665,8 +1790,29 @@ body.in-room .stage {
     padding: 10px;
 }
 .room-grid .win-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 8px;
     min-height: 0;
+}
+.room-grid .win-card {
+    padding: 8px;
+}
+.room-grid .win-head {
+    gap: 6px;
+}
+.room-grid .win-num {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+}
+.room-grid .win-title {
+    font-size: 11px;
+}
+.room-grid .win-time, .room-grid .win-tag {
+    font-size: 9px;
+}
+.room-grid .win-card img {
+    margin-top: 6px;
 }
 .room-grid .sidebar-foot {
     padding: 8px 12px;
@@ -2403,6 +2549,91 @@ body.in-room .stage {
     color: var(--amber);
     white-space: nowrap;
 }
+/* Daily reward: seven stops joined by a line that fills in as the days go by; the last one pays most */
+.daily-panel {
+    margin: 8px 0 16px;
+    padding: 20px 24px;
+}
+.daily-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+}
+.daily-steps {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin: 20px 0 12px;
+    padding: 0;
+    list-style: none;
+}
+.daily-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+/* The line from the stop before, filled once this one's done */
+.daily-step + .daily-step::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    right: 50%;
+    width: 100%;
+    height: 4px;
+    background-color: var(--surface-3);
+}
+.daily-step.done::before {
+    background-color: var(--stamp);
+}
+.daily-dot {
+    position: relative;
+    z-index: 1; /* Over the lines either side */
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-strong);
+    border-radius: 50%;
+    background-color: var(--surface);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+.daily-step:last-child .daily-dot {
+    border-color: var(--amber);
+}
+.daily-step.done .daily-dot {
+    border-color: var(--stamp);
+    background-color: var(--stamp);
+    color: var(--stamp-text);
+}
+.daily-step.next .daily-dot {
+    border-color: var(--stamp);
+    color: var(--heading);
+    box-shadow: 0 0 0 4px var(--stamp-ambient);
+    animation: daily-ready 1.6s ease-in-out infinite;
+}
+@keyframes daily-ready {
+    50% { box-shadow: 0 0 0 8px var(--stamp-ambient); }
+}
+.daily-coins {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+.daily-step.next .daily-coins {
+    color: var(--heading);
+}
+.daily-step:last-child .daily-coins {
+    color: var(--amber);
+}
+.daily-note {
+    margin: 0;
+}
 /* The card on the left; what's in the crate above the button on the right. Phones stack card, button, details */
 .shop-roll {
     display: grid;
@@ -2575,6 +2806,110 @@ body.in-room .stage {
     font-size: 16px;
     color: var(--heading);
 }
+/* A bingo celebration over everyone's screen: pieces fall from the top (or burst, or hop across), then go */
+.celebration {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    overflow: hidden;
+    pointer-events: none;
+}
+.celebration span {
+    position: absolute;
+    top: -48px;
+    left: var(--x);
+    font-size: 30px;
+    animation: celebrate-fall 2.4s ease-in var(--delay) both;
+}
+@keyframes celebrate-fall {
+    to { transform: translateY(calc(100vh + 96px)) rotate(var(--spin)); }
+}
+.celebrate-confetti span {
+    width: 9px;
+    height: 15px;
+    border-radius: 2px;
+    background-color: hsl(var(--hue) 85% 60%);
+}
+.celebrate-fireworks span {
+    top: 40%;
+    left: 50%;
+    animation: celebrate-burst 1.8s cubic-bezier(0.1, 0.7, 0.3, 1) var(--delay) both;
+}
+@keyframes celebrate-burst {
+    0% { transform: rotate(var(--angle)) translateX(0) scale(0.4); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: rotate(var(--angle)) translateX(45vmin) scale(1); opacity: 0; }
+}
+.celebrate-roo-stampede span {
+    top: var(--x);
+    left: -48px;
+    animation: celebrate-hop 2.4s linear var(--delay) both;
+}
+@keyframes celebrate-hop {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(calc(25vw + 24px), -40px); }
+    50% { transform: translate(calc(50vw + 48px), 0); }
+    75% { transform: translate(calc(75vw + 72px), -40px); }
+    100% { transform: translate(calc(100vw + 96px), 0); }
+}
+.extra-emoji {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2px 6px;
+    max-width: 80px;
+    min-height: 44px;
+    font-size: 22px;
+    line-height: 1.3;
+}
+
+/* Extras: everything the shop sells besides skins, bought once and worn in a slot */
+.shop-extras {
+    padding: 24px;
+}
+.shop-extras > .admin-hint {
+    margin: 6px 0 0;
+}
+.extra-group .menu-label {
+    margin: 18px 0 8px;
+}
+.extra-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+.extra {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-align: center;
+}
+.extra.wearing {
+    border-color: var(--stamp);
+    background-color: var(--stamp-ambient);
+}
+.extra-avatar {
+    width: 44px;
+    height: 44px;
+}
+.extra-banner {
+    align-self: stretch;
+    height: 40px;
+    border-radius: 8px;
+}
+.extra-name {
+    font-size: 13px;
+    color: var(--heading);
+}
+.extra-button {
+    width: 100%;
+    margin-top: auto;
+}
 .collection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -2675,6 +3010,9 @@ button.collection-item:focus-visible {
 }
 .card-dialog-side .admin-hint {
     margin: 0;
+}
+.card-buy {
+    margin-top: 10px;
 }
 .card-dialog-side .menu-label {
     margin: 16px 0 8px;
@@ -2793,6 +3131,18 @@ button.collection-item:focus-visible {
 .admin-row > .pack-select, .admin-row > .admin-stats {
     flex: 0 0 9.5rem;
     box-sizing: border-box;
+}
+.admin-row > .admin-counts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    flex: 0 0 16rem;
+    box-sizing: border-box;
+}
+.admin-counts .wins-input {
+    flex: 0 0 4.2em;
+    width: 4.2em;
 }
 .admin-row > .item-by {
     flex: 0 0 9rem;
@@ -3199,6 +3549,254 @@ button.collection-item:focus-visible {
 .toast-coins {
     color: var(--amber);
 }
+/* A name that opens that player's profile. :where keeps it from beating each list's own name styles */
+:where(.profile-link) {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.profile-link:hover {
+    text-decoration: underline;
+}
+/* Profile pop-up: a banner across the top with their picture over its edge and their numbers beside it, a big
+   name, then sections for the card they show off and what they've earned */
+.profile-dialog {
+    outline: 6px solid var(--surface-3);
+}
+.profile-banner {
+    display: grid;
+    place-items: center;
+    height: 120px;
+    margin: -24px -24px 0;
+    border-radius: 15px 15px 0 0;
+    background-color: var(--surface-3);
+}
+.profile-banner .logo-mark {
+    width: 56px;
+    height: 56px;
+}
+.profile-banner[class*=" banner-"] .logo-mark {
+    display: none;
+}
+.profile-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 20px;
+}
+.profile-avatar {
+    flex: none;
+    width: 92px;
+    height: 92px;
+    margin-top: -46px;
+    border: 4px solid var(--surface);
+    box-sizing: border-box;
+    background-color: var(--surface);
+}
+.panel-dialog .profile-stats {
+    display: flex;
+    gap: 20px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.profile-stats span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.profile-stats strong {
+    font-size: 18px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--heading);
+}
+.profile-action {
+    margin: 0 0 4px auto;
+    text-decoration: none;
+}
+.panel-dialog .profile-name {
+    margin: 16px 0 8px;
+    font-size: 26px;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+}
+.panel-dialog .profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+}
+.profile-meta > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.profile-meta > span + span::before {
+    content: "";
+    align-self: stretch;
+    margin-right: 6px;
+    border-left: 1px solid var(--border-strong);
+}
+.profile-meta > [hidden] + span::before {
+    display: none;
+}
+.profile-title {
+    font-weight: 600;
+    color: var(--amber);
+}
+.profile-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+.panel-dialog .profile-heading {
+    margin: 0 0 12px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--heading);
+}
+.profile-showcase-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.profile-showcase {
+    flex: none;
+}
+.profile-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.profile-facts strong {
+    font-size: 15px;
+    color: var(--heading);
+}
+.profile-achievements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+}
+.panel-dialog .profile-none {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+/* A title someone wears, under their name */
+.player-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--amber);
+}
+/* Frames, round someone's picture wherever it shows. Each has a still ring for when motion is turned off */
+.avatar.frame-gold-ring {
+    box-shadow: 0 0 0 2px #fbbf24, 0 0 8px rgba(251, 191, 36, 0.6);
+}
+.avatar.frame-hazard-tape {
+    box-shadow: 0 0 0 3px #1c1917;
+    outline: 3px dashed #facc15;
+}
+.avatar.frame-police-lights {
+    box-shadow: 0 0 0 2px #ef4444, 0 0 0 4px #3b82f6;
+    animation: police-lights 0.8s steps(1) infinite;
+}
+@keyframes police-lights {
+    0% { box-shadow: 0 0 0 2px #ef4444, 0 0 10px #ef4444; }
+    50% { box-shadow: 0 0 0 2px #3b82f6, 0 0 10px #3b82f6; }
+}
+.avatar.frame-rainbow-road {
+    box-shadow: 0 0 0 2px #a855f7;
+    animation: rainbow-road 3s linear infinite;
+}
+@keyframes rainbow-road {
+    0%, 100% { box-shadow: 0 0 0 2px #ef4444, 0 0 8px #ef4444; }
+    17% { box-shadow: 0 0 0 2px #f97316, 0 0 8px #f97316; }
+    33% { box-shadow: 0 0 0 2px #eab308, 0 0 8px #eab308; }
+    50% { box-shadow: 0 0 0 2px #22c55e, 0 0 8px #22c55e; }
+    67% { box-shadow: 0 0 0 2px #3b82f6, 0 0 8px #3b82f6; }
+    83% { box-shadow: 0 0 0 2px #a855f7, 0 0 8px #a855f7; }
+}
+/* Plain and 45-degree gradient frames (paint-*): a ring painted in the picture's own border, which a box-shadow
+   can't do with a gradient. Border-box keeps the picture its usual size, so lists don't shift */
+.avatar[class*=" frame-paint-"] {
+    box-sizing: border-box;
+    border: 2px solid transparent;
+    background: var(--frame-paint) border-box;
+}
+.profile-avatar[class*=" frame-paint-"] {
+    border-width: 4px;
+}
+.extra-avatar[class*=" frame-paint-"] {
+    border-width: 3px;
+}
+.frame-paint-school-zone { --frame-paint: #facc15; }
+.frame-paint-hi-vis { --frame-paint: #f97316; }
+.frame-paint-stop-sign { --frame-paint: #dc2626; }
+.frame-paint-road-sign-green { --frame-paint: #15803d; }
+.frame-paint-police-blue { --frame-paint: #1d4ed8; }
+.frame-paint-jacaranda { --frame-paint: #7c3aed; }
+.frame-paint-red-dirt { --frame-paint: #9a3412; }
+.frame-paint-bitumen-black { --frame-paint: #27272a; }
+.frame-paint-sunrise { --frame-paint: linear-gradient(45deg, #f97316, #facc15); }
+.frame-paint-ocean-drive { --frame-paint: linear-gradient(45deg, #06b6d4, #2563eb); }
+.frame-paint-jacaranda-bloom { --frame-paint: linear-gradient(45deg, #7c3aed, #ec4899); }
+.frame-paint-gum-tree { --frame-paint: linear-gradient(45deg, #84cc16, #0f766e); }
+.frame-paint-brake-lights { --frame-paint: linear-gradient(45deg, #ef4444, #7f1d1d); }
+.frame-paint-southern-lights { --frame-paint: linear-gradient(45deg, #22c55e, #6366f1); }
+/* Banners, across the top of someone's profile */
+.banner-outback-dusk {
+    background: linear-gradient(160deg, #fb923c, #b45309 55%, #451a03);
+}
+.banner-coastal-road {
+    background: linear-gradient(180deg, #38bdf8, #0e7490 60%, #fcd34d 61%, #f59e0b);
+}
+.banner-fresh-bitumen {
+    background: repeating-linear-gradient(90deg, #facc15 0 26px, transparent 26px 46px) center / 100% 4px no-repeat, #27272a;
+}
+.banner-night-drive {
+    background:
+        radial-gradient(circle at 18% 30%, #fde68a 0 2px, transparent 3px),
+        radial-gradient(circle at 52% 62%, #fde68a 0 2px, transparent 3px),
+        radial-gradient(circle at 82% 26%, #ffffff 0 1.5px, transparent 2.5px),
+        linear-gradient(180deg, #0f172a, #1e3a8a);
+}
+/* Plain colours, then two colours at 45 degrees */
+.banner-school-zone { background: #facc15; }
+.banner-hi-vis { background: #f97316; }
+.banner-stop-sign { background: #dc2626; }
+.banner-road-sign-green { background: #15803d; }
+.banner-police-blue { background: #1d4ed8; }
+.banner-jacaranda { background: #7c3aed; }
+.banner-red-dirt { background: #9a3412; }
+.banner-bitumen-black { background: #27272a; }
+.banner-sunrise { background: linear-gradient(45deg, #f97316, #facc15); }
+.banner-ocean-drive { background: linear-gradient(45deg, #06b6d4, #2563eb); }
+.banner-jacaranda-bloom { background: linear-gradient(45deg, #7c3aed, #ec4899); }
+.banner-gum-tree { background: linear-gradient(45deg, #84cc16, #0f766e); }
+.banner-brake-lights { background: linear-gradient(45deg, #ef4444, #7f1d1d); }
+.banner-southern-lights { background: linear-gradient(45deg, #22c55e, #6366f1); }
 .achievement-toast {
     position: fixed;
     top: 76px;

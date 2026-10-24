@@ -7,7 +7,7 @@ import cookieSession from "cookie-session";
 import { Server } from "socket.io";
 import { auth, isAdmin } from "./auth.js";
 import { cards } from "./cards.js";
-import { cardsIn, defaultPacks, store } from "./store.js";
+import { cardTable, cardsIn, defaultPacks } from "./store.js";
 import { suggestions } from "./suggestions.js";
 import { users } from "./users.js";
 import { leaderboard } from "./leaderboard.js";
@@ -50,7 +50,7 @@ app.get("/healthz", (req, res) => res.send("ok"));
 // The solo game here deals from the packs that are on by default (or every card, if they hold too few for a card)
 app.get("/phrases.txt", (req, res) => {
     const deck = cardsIn(defaultPacks());
-    res.type("text").send((deck.length >= 24 ? deck : store.cards).map(card => card.text).join("\n"));
+    res.type("text").send((deck.length >= 24 ? deck : cardTable.all()).map(card => card.text).join("\n"));
 });
 // Pages link their script and styles under /v/<version>/, so each deploy gets fresh copies
 // (Cloudflare tells browsers to keep .js and .css for 4 hours, whatever this server says)

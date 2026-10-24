@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { packsFrom, pickCards } from "./rooms.js";
-import { migrate, store } from "./store.js";
+import { cardStatsProblem } from "./cards.js";
+import { cardTable, migrate, packTable } from "./store.js";
 import { tidyLines } from "./suggestions.js";
 
 const card = (n, pack = "core", dealt = 0, spotted = 0) => ({ id: `c${n}`, text: `Card ${n}`, description: "", pack, dealt, spotted });
@@ -17,10 +18,18 @@ test("migrate turns the phrase list and approved suggestions into Core cards", (
     const data = migrate({ approved: [{ id: "s1", text: "Love tap", by, at: 5 }], suggestions: [] }, ["Speed camera", "Ute driver"]);
     assert.deepEqual(data.packs, [{ id: "core", name: "Core", description: "", on: true }]);
     assert.deepEqual(data.cards.map(c => c.text), ["Speed camera", "Ute driver", "Love tap"]);
-    assert.ok(data.cards.every(c => c.pack === "core" && c.dealt === 0 && c.spotted === 0 && c.description === ""));
-    assert.deepEqual(data.cards[2], { id: "s1", text: "Love tap", by, at: 5, description: "", pack: "core", dealt: 0, spotted: 0 });
+    assert.ok(data.cards.every(c => c.pack === "core" && c.dealt === 0 && c.spotted === 0 && c.counted === 0 && c.description === ""));
+    assert.deepEqual(data.cards[2], { id: "s1", text: "Love tap", by, at: 5, description: "", pack: "core", dealt: 0, spotted: 0, counted: 0 });
     assert.equal("approved" in data, false);
     assert.equal(migrate(data, ["Other"]).cards.length, 3); // Already migrated: left alone
+});
+
+test("cardStatsProblem accepts whole counts and rejects junk", () => {
+    assert.equal(cardStatsProblem({}), null);
+    assert.equal(cardStatsProblem({ counted: 5, spotted: 2, dealt: 10 }), null);
+    assert.match(cardStatsProblem({ counted: -1 }), /whole number/);
+    assert.match(cardStatsProblem({ spotted: 1.5 }), /whole number/);
+    assert.match(cardStatsProblem({ dealt: 100001 }), /whole number/);
 });
 
 test("pickCards deals 24 different cards, 8 from each third by how often they're spotted", () => {
@@ -37,14 +46,18 @@ test("pickCards deals 24 different cards, 8 from each third by how often they're
 });
 
 test("packsFrom keeps real packs with enough cards for a whole card", () => {
-    const saved = { packs: store.packs, cards: store.cards };
-    store.packs = [{ id: "a", on: true }, { id: "b", on: false }];
-    store.cards = [...Array.from({ length: 20 }, (_, i) => card(i, "a")), ...Array.from({ length: 10 }, (_, i) => card(20 + i, "b"))];
+    const cards = [...Array.from({ length: 20 }, (_, i) => card(i, "a")), ...Array.from({ length: 10 }, (_, i) => card(20 + i, "b"))];
+    packTable.put("a", { id: "a", on: true });
+    packTable.put("b", { id: "b", on: false });
+    for (const c of cards) cardTable.put(c.id, c);
     try {
         assert.deepEqual(packsFrom(["a", "b", "a", "nope"]), ["a", "b"]);
         assert.equal(packsFrom(["a"]), null); // Only 20 cards
         assert.equal(packsFrom("a"), null);
-    } finally {
-        Object.assign(store, saved); // In memory only; nothing here saves
+        assert.equal(packsFrom([{ id: "a" }, 1]), null, "only pack ids");
+    } finally { // An in-memory database, but tidy anyway
+        for (const c of cards) cardTable.remove(c.id);
+        packTable.remove("a");
+        packTable.remove("b");
     }
 });

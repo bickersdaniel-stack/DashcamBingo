@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import express, { Router } from "express";
 import { isAdmin } from "./auth.js";
-import { defaultPacks, isBlocked, save, store } from "./store.js";
+import { cardTable, defaultPacks, isBlocked, packTable, suggestionTable } from "./store.js";
 
 export const suggestions = Router();
 export const json = express.json({ limit: "2kb" }); // JSON only, so other sites can't post here with a plain form
@@ -21,8 +21,8 @@ const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 function problemWith(text, ignoreId) {
     if (text.length < 3) return "Make it at least 3 characters.";
     if (text.length > 60) return "Keep it to 60 characters so it fits on a square.";
-    if (store.cards.some(card => card.id !== ignoreId && same(card.text, text))) return "That one's already on the cards.";
-    if (store.suggestions.some(s => s.status === "pending" && s.id !== ignoreId && same(s.text, text))) return "Someone's already suggested that.";
+    if (cardTable.all().some(card => card.id !== ignoreId && same(card.text, text))) return "That one's already on the cards.";
+    if (suggestionTable.all().some(s => s.status === "pending" && s.id !== ignoreId && same(s.text, text))) return "Someone's already suggested that.";
     return null;
 }
 
@@ -30,11 +30,11 @@ const descriptionProblem = description => description.length > 300 ? "Keep the d
 
 export function cardProblem({ text, description, pack }, ignoreId) {
     return problemWith(text, ignoreId) ?? descriptionProblem(description)
-        ?? (store.packs.some(p => p.id === pack) ? null : "Pick a pack.");
+        ?? (packTable.get(pack) ? null : "Pick a pack.");
 }
 
 suggestions.get("/api/suggestions", signedIn, (req, res) => {
-    res.json(store.suggestions.filter(s => s.by.id === req.session.user.id).slice(-20).reverse());
+    res.json(suggestionTable.all().filter(s => s.by.id === req.session.user.id).slice(-20).reverse());
 });
 
 suggestions.post("/api/suggestions", signedIn, json, (req, res) => {
@@ -44,41 +44,44 @@ suggestions.post("/api/suggestions", signedIn, json, (req, res) => {
     const description = tidyLines(req.body?.description);
     const problem = problemWith(text) ?? descriptionProblem(description);
     if (problem) return res.status(400).json({ error: problem });
-    if (store.suggestions.filter(s => s.by.id === user.id && s.status === "pending").length >= 5) {
+    if (suggestionTable.all().filter(s => s.by.id === user.id && s.status === "pending").length >= 5) {
         return res.status(429).json({ error: "You have 5 waiting already. Wait for those to be looked at." });
     }
     if (Date.now() - (lastSuggestion.get(user.id) ?? 0) < 10_000) return res.status(429).json({ error: "Give it a few seconds between suggestions." });
     lastSuggestion.set(user.id, Date.now());
     const suggestion = { id: randomUUID(), text, description, by: { id: user.id, name: user.name }, at: Date.now(), status: "pending" };
-    store.suggestions.push(suggestion);
-    save();
+    suggestionTable.put(suggestion.id, suggestion);
     res.json(suggestion);
 });
 
 suggestions.get("/api/admin/suggestions", adminOnly, (req, res) => {
-    res.json({ pending: store.suggestions.filter(s => s.status === "pending") });
+    res.json({ pending: suggestionTable.all().filter(s => s.status === "pending") });
 });
 
 // Approve into a pack (optionally with tidied-up wording and description) or reject a suggestion
+// The suggestion and its new card are written in one transaction
 suggestions.post("/api/admin/suggestions/:id", adminOnly, json, (req, res) => {
-    const suggestion = store.suggestions.find(s => s.id === req.params.id && s.status === "pending");
-    if (!suggestion) return res.status(404).json({ error: "That suggestion has already been dealt with." });
-    if (req.body?.action === "reject") {
-        suggestion.status = "rejected";
-    } else if (req.body?.action === "approve") {
-        const card = {
-            text: req.body.text === undefined ? suggestion.text : tidy(req.body.text),
-            description: req.body.description === undefined ? suggestion.description ?? "" : tidyLines(req.body.description),
-            pack: String(req.body.pack ?? defaultPacks()[0] ?? store.packs[0].id)
-        };
-        const problem = cardProblem(card, suggestion.id);
-        if (problem) return res.status(400).json({ error: problem });
-        Object.assign(suggestion, { status: "approved", text: card.text, description: card.description });
-        store.cards.push({ id: suggestion.id, ...card, by: suggestion.by, at: Date.now(), dealt: 0, spotted: 0 });
-    } else {
-        return res.status(400).json({ error: "Approve or reject." });
-    }
-    suggestion.decidedAt = Date.now();
-    save();
-    res.json(suggestion);
+    const gone = { status: 404, error: "That suggestion has already been dealt with." };
+    const result = suggestionTable.update(req.params.id, suggestion => {
+        if (suggestion.status !== "pending") return gone;
+        if (req.body?.action === "reject") {
+            suggestion.status = "rejected";
+        } else if (req.body?.action === "approve") {
+            const card = {
+                text: req.body.text === undefined ? suggestion.text : tidy(req.body.text),
+                description: req.body.description === undefined ? suggestion.description ?? "" : tidyLines(req.body.description),
+                pack: String(req.body.pack ?? defaultPacks()[0] ?? packTable.all()[0].id)
+            };
+            const problem = cardProblem(card, suggestion.id);
+            if (problem) return { status: 400, error: problem };
+            Object.assign(suggestion, { status: "approved", text: card.text, description: card.description });
+            cardTable.put(suggestion.id, { id: suggestion.id, ...card, by: suggestion.by, at: Date.now(), dealt: 0, spotted: 0, counted: 0 });
+        } else {
+            return { status: 400, error: "Approve or reject." };
+        }
+        suggestion.decidedAt = Date.now();
+        return { suggestion };
+    }) ?? gone;
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result.suggestion);
 });

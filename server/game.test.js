@@ -107,12 +107,14 @@ test("buy takes the coins, puts a card's first skin on, refunds duplicates, and 
     const profile = { coins: rollCost * 3 };
     const first = buy(profile, shopCards, seeded(1));
     assert.equal(profile.skins[first.card.id].equipped, first.skin.id, "first skin goes on");
+    assert.equal(first.worn, true, "and says so");
     assert.equal(profile.coins, rollCost * 2);
 
     // The same card and style again: a duplicate, with coins back
     const again = buy(profile, [shopCards.find(c => c.id === first.card.id)], seeded(1));
     if (again.skin.id === first.skin.id) {
         assert.equal(again.duplicate, true);
+        assert.equal(again.worn, false);
         assert.equal(profile.coins, rollCost + duplicateRefund);
     }
 

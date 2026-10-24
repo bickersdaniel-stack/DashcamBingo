@@ -1,6 +1,7 @@
 // Leaderboard page: your numbers, the players with the most bingos, the achievements you're closest to,
 // and the cards spotted most often
 import { cardRow, playerRow } from "./board.js";
+import { fillPlayCard } from "./playcard.js";
 
 const $ = id => document.getElementById(id);
 const tabFor = id => document.querySelector(`.tab[aria-controls="${id}"]`);
@@ -14,11 +15,7 @@ function selectTab(tab) {
         other.setAttribute("aria-selected", other === tab);
         $(other.getAttribute("aria-controls")).hidden = other !== tab;
     });
-    const cards = tab.getAttribute("aria-controls") === "cardsPanel";
-    $("navLeaderboard").removeAttribute("aria-current");
-    $("navCards").removeAttribute("aria-current");
-    (cards ? $("navCards") : $("navLeaderboard")).setAttribute("aria-current", "page");
-    const want = cards ? "#cards" : "";
+    const want = tab.getAttribute("aria-controls") === "cardsPanel" ? "#cards" : "";
     if (location.hash !== want) history.replaceState(null, "", want || location.pathname);
 }
 
@@ -40,7 +37,7 @@ if (!response.ok) {
     $("playerCount").textContent = `${total} with a bingo`;
     $("statRank").textContent = me ? `#${me.rank}` : "–";
     $("statRankNote").textContent = me ? `of ${total} players` : "Get a bingo to place";
-    $("cardBoard").replaceChildren(...(cards.length ? cards.map((card, i) => cardRow(card, i + 1)) : [empty("No cards yet.")]));
+    showCards(cards);
 }
 if (account.ok) {
     const { wins, coins = 0 } = await account.json();
@@ -80,6 +77,36 @@ function showAchievements(list) {
         }
         return item;
     }));
+}
+
+// The three most spotted and the rare sightings as playing cards, then every card, searchable and by pack
+function showCards(cards) {
+    const placed = cards.map((card, i) => ({ card, place: i + 1 })); // Places stay put while the list is filtered
+    const ranked = placed.filter(({ card }) => card.rate !== null);
+    const rare = ranked.filter(({ card }) => card.rare).reverse(); // Rarest first
+    const strip = list => list.map(({ card, place }) => {
+        const item = el("div", "strip-item");
+        const face = el("div", "play-card mini");
+        fillPlayCard(face, { name: card.text, note: card.description, packId: card.packId, packName: card.pack, rate: card.rate });
+        item.append(el("span", `podium-rank board-rank ${card.rare ? "" : ["gold", "silver", "bronze"][place - 1] ?? ""}`, card.rare ? "Rare" : `#${place}`), face);
+        return item;
+    });
+    $("topCards").replaceChildren(...strip(ranked.slice(0, 3)));
+    $("rareCards").replaceChildren(...strip(rare));
+    $("cardHighlights").hidden = !ranked.length;
+    $("rarePanel").hidden = !rare.length;
+
+    $("cardPack").append(...[...new Set(cards.map(card => card.pack))].sort().map(pack => new Option(pack, pack)));
+    const showList = () => {
+        const search = $("cardSearch").value.trim().toLowerCase();
+        const pack = $("cardPack").value;
+        const shown = placed.filter(({ card }) => (!pack || card.pack === pack) && card.text.toLowerCase().includes(search));
+        $("cardCount").textContent = `${shown.length} of ${cards.length} cards`;
+        $("cardBoard").replaceChildren(...(shown.length ? shown.map(({ card, place }) => cardRow(card, place)) : [empty(cards.length ? "No cards match." : "No cards yet.")]));
+    };
+    $("cardSearch").addEventListener("input", showList);
+    $("cardPack").addEventListener("input", showList);
+    showList();
 }
 
 function empty(text) {

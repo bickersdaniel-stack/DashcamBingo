@@ -24,8 +24,8 @@
             <a class="wordmark" href="/">Dashcam Bingo</a>
             <nav class="bar-nav" aria-label="Pages">
                 <a class="pill" href="/">Lobby</a>
-                <a class="pill" href="/leaderboard" id="navLeaderboard" aria-current="page">Leaderboard</a>
-                <a class="pill" href="/leaderboard#cards" id="navCards">Cards</a>
+                <a class="pill" href="/leaderboard" aria-current="page">Leaderboard</a>
+                <a class="pill" href="/cards">Cards</a>
                 <a class="pill" href="/shop">Shop</a>
             </nav>
         </div>
@@ -74,8 +74,30 @@
         </section>
 
         <section class="admin-panel" id="cardsPanel" role="tabpanel" hidden>
-            <p class="admin-hint">How often each square gets spotted when it's on someone's card. The least spotted are rare sightings.</p>
-            <ol class="item-list board-list" id="cardBoard"></ol>
+            <div class="card-highlights" id="cardHighlights" hidden>
+                <div class="board-panel">
+                    <h3>Most spotted</h3>
+                    <p class="admin-hint">These turn up in nearly every video.</p>
+                    <div class="card-strip" id="topCards"></div>
+                </div>
+                <div class="board-panel" id="rarePanel">
+                    <h3>Rare sightings</h3>
+                    <p class="admin-hint">The least spotted. Count one of these and you've earned the bragging rights.</p>
+                    <div class="card-strip" id="rareCards"></div>
+                </div>
+            </div>
+            <div class="board-panel">
+                <div class="board-panel-head">
+                    <h3>All cards</h3>
+                    <span class="admin-count" id="cardCount"></span>
+                </div>
+                <p class="admin-hint">How often each square gets spotted when it's on someone's card.</p>
+                <div class="admin-tools">
+                    <input class="link-input" id="cardSearch" type="search" placeholder="Search cards" autocomplete="off" aria-label="Search cards">
+                    <select class="quality-select" id="cardPack" aria-label="Pack"><option value="">All packs</option></select>
+                </div>
+                <ol class="item-list board-list" id="cardBoard"></ol>
+            </div>
         </section>
     </main>
 

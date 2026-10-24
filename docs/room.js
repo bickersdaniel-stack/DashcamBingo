@@ -1015,9 +1015,10 @@ function showPackTotal() {
     return enough;
 }
 
-// A square's details open as a playing card at the pointer after a while: resting the mouse on it, or holding a
-// finger on it. Long enough that it doesn't pop up while you move around the card
+// A square's details open as a playing card at the pointer: after resting the mouse on it a while (long enough that
+// it doesn't pop up while you move around the card), or holding a finger on it like any phone's long press
 const tipDelayMs = 2000;
+const holdDelayMs = 500;
 const square = ".bingo-cell:not(.center-cell)";
 async function loadCardInfo() {
     const { ok, data } = await api("GET", "/api/cards");
@@ -1090,7 +1091,7 @@ function setUpCardTips() {
         timer = setTimeout(() => {
             showAt(cell, start.x, start.y);
             swallowClick = true;
-        }, tipDelayMs);
+        }, holdDelayMs);
     });
     for (const type of ["pointerup", "pointercancel"]) {
         card.addEventListener(type, event => {

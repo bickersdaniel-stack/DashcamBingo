@@ -176,9 +176,12 @@ export function drawBoard(phrases, onCount, notes = [], counts = []) {
                 onCount(i, count, by);
             };
             cell.addEventListener("click", event => change(event.target.closest(".cell-minus") ? -1 : 1));
+            // Phones fire contextmenu on a long press too, which opens the details; only a real right click takes one off
+            let touched = false;
+            cell.addEventListener("pointerdown", event => touched = event.pointerType === "touch");
             cell.addEventListener("contextmenu", event => {
                 event.preventDefault();
-                change(-1);
+                if (!touched) change(-1);
             });
             cell.addEventListener("keydown", event => {
                 if (event.target !== cell) return; // The minus button's own Enter arrives as a click

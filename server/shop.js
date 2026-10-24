@@ -67,7 +67,8 @@ export function buy(profile, cards, random = randomInt) {
     const earned = recordProgress(profile, { legendaries: rarity.id === "legendary" ? 1 : 0, skins: duplicate ? 0 : 1 });
     return {
         card: { id: card.id, text: card.text, pack: card.pack, description: card.description },
-        skin: skinInfo(style.id), duplicate, refund: duplicate ? duplicateRefund : 0, coins: profile.coins, pity: profile.pity,
+        skin: skinInfo(style.id), duplicate, worn: !duplicate && entry.equipped === style.id,
+        refund: duplicate ? duplicateRefund : 0, coins: profile.coins, pity: profile.pity,
         achievements: earned.map(a => ({ name: a.name, description: a.description, coins: a.coins }))
     };
 }
@@ -88,6 +89,7 @@ shop.post("/api/shop/roll", signedIn, (req, res) => {
     const result = buy(profile, store.cards);
     if (result.error) return res.status(400).json(result);
     save();
+    result.card.packName = store.packs.find(pack => pack.id === result.card.pack)?.name ?? "";
     res.json(result);
 });
 

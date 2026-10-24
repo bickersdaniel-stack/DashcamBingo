@@ -2,7 +2,7 @@
 // are kept; access tokens are thrown away and email addresses are never shown to other players.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
-import { store } from "./store.js";
+import { store, touchProfile } from "./store.js";
 
 const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, PUBLIC_URL, SESSION_SECRET } = process.env;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Dashcam Bingo <bingo@dkb.lol>";
@@ -17,12 +17,16 @@ export const isOwner = id => adminIds.includes(id);
 export const isAdmin = user => !!user && (isOwner(user.id) || store.profiles[user.id]?.admin === true);
 
 auth.get("/api/me", (req, res) => {
-    if (req.session.user) return res.json({
-        ...req.session.user, admin: isAdmin(req.session.user),
-        wins: store.profiles[req.session.user.id]?.wins ?? 0,
-        coins: store.profiles[req.session.user.id]?.coins ?? 0,
-        newSkins: store.profiles[req.session.user.id]?.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
-    });
+    if (req.session.user) {
+        // Signed in but never joined a room: still show them on the admin people list
+        if (!store.profiles[req.session.user.id]) touchProfile(req.session.user);
+        return res.json({
+            ...req.session.user, admin: isAdmin(req.session.user),
+            wins: store.profiles[req.session.user.id]?.wins ?? 0,
+            coins: store.profiles[req.session.user.id]?.coins ?? 0,
+            newSkins: store.profiles[req.session.user.id]?.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
+        });
+    }
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up
 });
 
@@ -67,6 +71,7 @@ auth.get("/auth/discord/callback", async (req, res) => {
             ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=64`
             : `https://cdn.discordapp.com/embed/avatars/${(BigInt(me.id) >> 22n) % 6n}.png`;
         req.session.user = { id: me.id, name: me.global_name ?? me.username, avatar };
+        touchProfile(req.session.user);
         res.redirect(next);
     } catch (error) {
         console.error(error);
@@ -98,6 +103,7 @@ auth.get("/auth/google/callback", async (req, res) => {
         const me = await getJson("https://openidconnect.googleapis.com/v1/userinfo", token.access_token);
         const name = (me.name || me.given_name || "Google player").slice(0, 32);
         req.session.user = { id: `google:${me.sub}`, name, avatar: me.picture || initialAvatar(name, me.sub) };
+        touchProfile(req.session.user);
         res.redirect(next);
     } catch (error) {
         console.error(error);
@@ -152,6 +158,7 @@ auth.post("/auth/email/finish", express.urlencoded({ extended: false, limit: "2k
     // The id comes from the address but can't be turned back into it, so other players never see emails
     const id = `email:${createHash("sha256").update(data.email).digest("hex").slice(0, 24)}`;
     req.session.user = { id, name: data.name, avatar: initialAvatar(data.name, id) };
+    touchProfile(req.session.user);
     res.redirect(data.next);
 });
 

@@ -1,5 +1,5 @@
-// Admins see everyone who has joined a room, and can make admins, block people, fix win and coin counts,
-// and set how many coins players earn
+// Admins see everyone who has signed in (or left a name on a card or suggestion), and can make admins,
+// block people, fix win and coin counts, and set how many coins players earn
 import { Router } from "express";
 import { isOwner } from "./auth.js";
 import { kickUser, refreshPlayer } from "./rooms.js";
@@ -9,17 +9,28 @@ import { adminOnly, json } from "./suggestions.js";
 export const users = Router();
 const signedInWith = id => id.startsWith("google:") ? "google" : id.startsWith("email:") ? "email" : "discord";
 
-users.get("/api/admin/users", adminOnly, (req, res) => {
-    res.json(Object.entries(store.profiles).map(([id, profile]) => {
-        const theirs = store.suggestions.filter(s => s.by.id === id);
+users.get("/api/admin/users", adminOnly, (req, res) => res.json(listAdminUsers()));
+
+// Profiles first, then anyone we only know from a suggestion or card they sent
+export function listAdminUsers() {
+    const people = new Map(Object.entries(store.profiles));
+    for (const { by } of [...store.suggestions, ...store.cards]) {
+        if (by?.id && !people.has(by.id)) people.set(by.id, { name: by.name, wins: 0 });
+    }
+    return [...people].map(([id, profile]) => {
+        const theirs = store.suggestions.filter(s => s.by?.id === id);
         return {
             id, name: profile.name ?? "Someone", avatar: profile.avatar ?? "", via: signedInWith(id),
             wins: profile.wins ?? 0, coins: profile.coins ?? 0, seenAt: profile.seenAt ?? null,
             owner: isOwner(id), admin: isOwner(id) || profile.admin === true, blocked: profile.blocked === true,
             suggested: theirs.length, approved: theirs.filter(s => s.status === "approved").length
         };
-    }).sort((a, b) => (b.seenAt ?? 0) - (a.seenAt ?? 0) || a.name.localeCompare(b.name)));
-});
+    }).sort((a, b) => (b.seenAt ?? 0) - (a.seenAt ?? 0) || a.name.localeCompare(b.name));
+}
+
+function knownName(id) {
+    return [...store.suggestions, ...store.cards].find(item => item.by?.id === id)?.by?.name;
+}
 
 // What's wrong with a change to someone, if anything. Owners stay admins, and nobody can lock themselves out
 export function userChangeProblem(id, profile, changes, myId) {
@@ -36,8 +47,10 @@ export function userChangeProblem(id, profile, changes, myId) {
 
 users.patch("/api/admin/users/:id", adminOnly, json, (req, res) => {
     const id = req.params.id;
+    const name = knownName(id);
+    if (!store.profiles[id] && name) store.profiles[id] = { wins: 0, name };
     const profile = store.profiles[id];
-    if (!profile) return res.status(404).json({ error: "Nobody with that id has joined a room." });
+    if (!profile) return res.status(404).json({ error: "Nobody with that id has signed in." });
     const changes = { wins: req.body?.wins, coins: req.body?.coins, admin: req.body?.admin, blocked: req.body?.blocked };
     const problem = userChangeProblem(id, profile, changes, req.session.user.id);
     if (problem) return res.status(400).json({ error: problem });

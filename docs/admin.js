@@ -47,6 +47,7 @@ async function load() {
         api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users"), api("GET", "/api/admin/settings")
     ]);
     if (!all.ok) return message(all.data.error, false);
+    if (!people.ok) return message(people.data.error, false);
     ({ packs, cards } = all.data);
     users = people.data;
     fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
@@ -168,7 +169,7 @@ function showUsers() {
             if (done(await api("PATCH", `/api/admin/users/${encodeURIComponent(user.id)}`, body), text)) load();
         };
         const who = el("span", "user-who");
-        const seen = user.seenAt ? `last played ${new Date(user.seenAt).toLocaleDateString()}` : "not played since this update";
+        const seen = user.seenAt ? `last seen ${new Date(user.seenAt).toLocaleDateString()}` : "not seen since this update";
         who.append(el("strong", "", user.name), el("span", "item-by", `${signedInWith[user.via]} · ${seen}`));
         const tags = [user.owner ? "Owner" : user.admin && "Admin", user.blocked && "Blocked"].filter(Boolean);
         const wins = Object.assign(input(String(user.wins), 6, `Wins for ${user.name}`), { type: "number", min: 0, max: 100000 });

@@ -43,7 +43,6 @@ if (account.ok) {
     const { wins, coins = 0 } = await account.json();
     $("statWins").textContent = wins;
     $("statCoins").textContent = coins.toLocaleString();
-    $("coins").textContent = `🪙 ${coins.toLocaleString()} coins`;
 }
 if (achievements.ok) showAchievements(await achievements.json());
 

@@ -6,6 +6,7 @@ import { fillPlayCard, wearSkin } from "./playcard.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
+import { coinsText, showNewSkins, signedInWith, winsText } from "./nav.js";
 
 const $ = id => document.getElementById(id);
 const code = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})$/)?.[1].toUpperCase();
@@ -46,6 +47,8 @@ if (me) {
     document.querySelectorAll(".my-name").forEach(el => el.textContent = me.name); // textContent: names are untrusted
     showMyWins(me.wins);
     showMyCoins(me.coins ?? 0);
+    showNewSkins(me.newSkins);
+    document.querySelector(".my-via").textContent = signedInWith(me.id);
     setUpMenu("account", "account");
     setUpSuggestions();
     welcome();
@@ -691,8 +694,7 @@ function videoSecondsNow() {
 }
 
 function showMyWins(n) {
-    const text = n === 1 ? "🏆 1 win" : `🏆 ${n} wins`;
-    document.querySelectorAll(".my-wins").forEach(el => { el.textContent = text; });
+    document.querySelectorAll(".my-wins").forEach(el => { el.textContent = winsText(n); });
 }
 
 // The Leaderboard tile: the top five players and most spotted squares
@@ -745,8 +747,7 @@ async function showAchievements() {
 }
 
 function showMyCoins(n) {
-    const text = n === 1 ? "🪙 1 coin" : `🪙 ${n} coins`;
-    document.querySelectorAll(".my-coins").forEach(el => { el.textContent = text; });
+    document.querySelectorAll(".my-coins").forEach(el => { el.textContent = coinsText(n); });
 }
 
 // "+1" floating up out of the square a coin was earned on

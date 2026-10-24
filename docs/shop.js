@@ -1,5 +1,6 @@
 // Shop page: roll for card skins with coins from playing and watch the card flip. Wearing them is on the Cards page
 import { fillPlayCard } from "./playcard.js";
+import { coinsText, showNewSkins } from "./nav.js";
 
 const $ = id => document.getElementById(id);
 let shop = null;
@@ -22,7 +23,7 @@ if (!loaded.ok) {
 }
 
 function showCoins() {
-    $("coins").textContent = `🪙 ${shop.coins.toLocaleString()} coins`;
+    document.querySelectorAll(".my-coins").forEach(el => el.textContent = coinsText(shop.coins)); // The bar and the menu
     $("rollButton").textContent = rolling ? "Rolling…" : `${$("rollResult").hasChildNodes() ? "Roll again" : "Roll"} · ${shop.cost} 🪙`;
     $("rollButton").disabled = rolling || shop.coins < shop.cost;
     // Said out loud rather than in a tooltip, which phones never show
@@ -41,14 +42,15 @@ async function roll() {
     showCoins();
     $("revealInner").classList.remove("flipped");
     $("reveal").className = "reveal rolling";
-    const [result] = await Promise.all([api("POST", "/api/shop/roll"), new Promise(r => setTimeout(r, 900))]); // Let it shake a moment
+    const [result] = await Promise.all([api("POST", "/api/shop/roll"), new Promise(r => setTimeout(r, 1100))]); // At least one sweep of the loading shimmer
     rolling = false;
     if (!result.ok) {
         $("reveal").className = "reveal";
         $("rollResult").replaceChildren(el("p", "email-message error", result.data.error)); // Next to the button, not up top
         return showCoins();
     }
-    const { card, skin, duplicate, worn, refund, coins, pity, achievements } = result.data;
+    const { card, skin, duplicate, worn, refund, coins, pity, newSkins, achievements } = result.data;
+    showNewSkins(newSkins);
     Object.assign(shop, { coins, pity });
     fillPlayCard($("revealFront"), { name: card.text, note: card.description, packId: card.pack, packName: card.packName, skin });
     $("revealFront").classList.add("reveal-face", "reveal-front");

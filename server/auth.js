@@ -20,7 +20,8 @@ auth.get("/api/me", (req, res) => {
     if (req.session.user) return res.json({
         ...req.session.user, admin: isAdmin(req.session.user),
         wins: store.profiles[req.session.user.id]?.wins ?? 0,
-        coins: store.profiles[req.session.user.id]?.coins ?? 0
+        coins: store.profiles[req.session.user.id]?.coins ?? 0,
+        newSkins: store.profiles[req.session.user.id]?.newSkins?.length ?? 0 // For the "Cards (+3)" in the top bar
     });
     res.status(401).json({ google: !!GOOGLE_CLIENT_ID, email: !!RESEND_API_KEY }); // Which ways to sign in are set up
 });

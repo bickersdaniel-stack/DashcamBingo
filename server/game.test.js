@@ -108,6 +108,8 @@ test("buy takes the coins, puts a card's first skin on, refunds duplicates, and 
     const first = buy(profile, shopCards, seeded(1));
     assert.equal(profile.skins[first.card.id].equipped, first.skin.id, "first skin goes on");
     assert.equal(first.worn, true, "and says so");
+    assert.deepEqual(profile.newSkins, [first.card.id], "new until the Cards page is opened");
+    assert.equal(first.newSkins, 1);
     assert.equal(profile.coins, rollCost * 2);
 
     // The same card and style again: a duplicate, with coins back
@@ -115,6 +117,7 @@ test("buy takes the coins, puts a card's first skin on, refunds duplicates, and 
     if (again.skin.id === first.skin.id) {
         assert.equal(again.duplicate, true);
         assert.equal(again.worn, false);
+        assert.equal(profile.newSkins.length, 1, "a repeat isn't new");
         assert.equal(profile.coins, rollCost + duplicateRefund);
     }
 

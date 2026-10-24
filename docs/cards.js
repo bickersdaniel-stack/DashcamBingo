@@ -1,6 +1,7 @@
 // Cards page: every square with the skins you've collected for it, to search, filter and sort, and each one up close
 // with its details and every skin: the ones you own to wear, the rest to preview
 import { fillPlayCard } from "./playcard.js";
+import { showNewSkins } from "./nav.js";
 
 const $ = id => document.getElementById(id);
 const rarityOrder = ["common", "rare", "epic", "legendary"];
@@ -25,11 +26,13 @@ if (!collection.ok) {
     cards = collection.data.map(card => ({ ...card, rate: rates.get(card.id) ?? null }));
     if (shop.ok) {
         styles = [...shop.data.styles].sort((a, b) => rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity));
-        $("coins").textContent = `🪙 ${shop.data.coins.toLocaleString()} coins`;
     }
     $("cardPack").append(...[...new Set(cards.map(card => card.packName))].sort().map(name => new Option(name, name)));
     for (const id of ["cardSearch", "cardPack", "cardOwned", "cardRarity", "cardSort"]) $(id).addEventListener("input", showCards);
     showCards();
+    // Seen now: the "(+3)" goes, and the new ones stay on top until you leave the page
+    showNewSkins(0);
+    api("POST", "/api/me/skins/seen");
 }
 
 function showCards() {
@@ -39,7 +42,7 @@ function showCards() {
         && (!pack || card.packName === pack)
         && (!owned || (owned === "owned" ? card.owned.length > 0 : owned === "none" ? !card.owned.length : !!card.equipped))
         && (!rarity || card.owned.some(skin => skin.rarity === rarity)))
-        .sort(sorts[$("cardSort").value]);
+        .sort((a, b) => b.new - a.new || sorts[$("cardSort").value](a, b)); // New skins first
     const skins = cards.reduce((sum, card) => sum + card.owned.length, 0);
     $("cardCount").textContent = `${shown.length} of ${cards.length} cards · ${skins} skin${skins === 1 ? "" : "s"} collected`;
     $("collection").replaceChildren(...(shown.length ? shown.map(tile) : [el("p", "admin-hint", "No cards match.")]));
@@ -50,7 +53,8 @@ function tile(card) {
     const wearing = worn(card);
     const head = el("div", "collection-head");
     head.append(wearing ? el("span", `rarity-tag rarity-${wearing.rarity}`, wearing.rarity) : el("span", "rarity-tag", card.owned.length ? "No skin on" : "No skins"),
-        el("span", "collection-owned", `${card.owned.length} owned`));
+        ...(card.new ? [el("span", "new-tag", "New")] : []),
+        el("span", "collection-owned", styles.length ? `${card.owned.length}/${styles.length}` : `${card.owned.length} owned`));
     const face = el("div", "play-card mini");
     fillPlayCard(face, playCardOf(card, wearing));
     item.append(head, face);
@@ -69,14 +73,10 @@ function showDetail(preview = null) {
     $("detailName").textContent = card.text;
     $("detailMeta").textContent = `${card.packName} · ${card.rate === null ? "New card, not enough games yet" : `Spotted in ${card.rate}% of the games it's dealt in`}`;
     const ownedIds = new Set(card.owned.map(skin => skin.id));
+    $("skinCount").textContent = `Skins ${card.owned.length}/${styles.length}`;
     $("skinChoices").replaceChildren(skinChoice("No skin", null, card.owned.length > 0),
         ...styles.map(style => skinChoice(style.name, style.id, ownedIds.has(style.id), style)));
-    if (preview && !ownedIds.has(preview.id)) {
-        $("skinHint").textContent = `Previewing ${preview.name} (${preview.rarity}). You haven't rolled it for this card yet.`;
-    } else {
-        $("skinHint").replaceChildren(`You have ${card.owned.length} of ${styles.length} skins for this card. Each roll gives a skin for a random card. `,
-            Object.assign(el("a", "", "Go to the shop"), { href: "/shop" }));
-    }
+    $("skinHint").textContent = preview && !ownedIds.has(preview.id) ? `Previewing ${preview.name} (${preview.rarity}). You haven't rolled it for this card yet.` : "";
 }
 
 // Owned skins put on when picked; the rest only preview on the card

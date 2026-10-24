@@ -3615,6 +3615,33 @@ button.collection-item:focus-visible {
     67% { box-shadow: 0 0 0 2px #3b82f6, 0 0 8px #3b82f6; }
     83% { box-shadow: 0 0 0 2px #a855f7, 0 0 8px #a855f7; }
 }
+/* Plain and 45-degree gradient frames (paint-*): a ring painted in the picture's own border, which a box-shadow
+   can't do with a gradient. Border-box keeps the picture its usual size, so lists don't shift */
+.avatar[class*=" frame-paint-"] {
+    box-sizing: border-box;
+    border: 2px solid transparent;
+    background: var(--frame-paint) border-box;
+}
+.profile-avatar[class*=" frame-paint-"] {
+    border-width: 4px;
+}
+.extra-avatar[class*=" frame-paint-"] {
+    border-width: 3px;
+}
+.frame-paint-school-zone { --frame-paint: #facc15; }
+.frame-paint-hi-vis { --frame-paint: #f97316; }
+.frame-paint-stop-sign { --frame-paint: #dc2626; }
+.frame-paint-road-sign-green { --frame-paint: #15803d; }
+.frame-paint-police-blue { --frame-paint: #1d4ed8; }
+.frame-paint-jacaranda { --frame-paint: #7c3aed; }
+.frame-paint-red-dirt { --frame-paint: #9a3412; }
+.frame-paint-bitumen-black { --frame-paint: #27272a; }
+.frame-paint-sunrise { --frame-paint: linear-gradient(45deg, #f97316, #facc15); }
+.frame-paint-ocean-drive { --frame-paint: linear-gradient(45deg, #06b6d4, #2563eb); }
+.frame-paint-jacaranda-bloom { --frame-paint: linear-gradient(45deg, #7c3aed, #ec4899); }
+.frame-paint-gum-tree { --frame-paint: linear-gradient(45deg, #84cc16, #0f766e); }
+.frame-paint-brake-lights { --frame-paint: linear-gradient(45deg, #ef4444, #7f1d1d); }
+.frame-paint-southern-lights { --frame-paint: linear-gradient(45deg, #22c55e, #6366f1); }
 /* Banners, across the top of someone's profile */
 .banner-outback-dusk {
     background: linear-gradient(160deg, #fb923c, #b45309 55%, #451a03);

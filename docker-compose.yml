@@ -1,11 +1,35 @@
+# CasaOS format: absolute paths, because CasaOS runs its own copy of this file from /var/lib/casaos/apps/dashcam-bingo.
+# Import it once (CasaOS → App Store → Custom Install → Import). docker compose up -d --build from here still runs the
+# same app, since the project name matches
+name: dashcam-bingo
 services:
   app:
-    build: .
-    env_file: .env
+    build:
+      context: /DATA/AppData/Dashcam-bingo
+    image: dashcam-bingo-app:latest
+    env_file:
+      - /DATA/AppData/Dashcam-bingo/.env
     restart: unless-stopped
     # Only this box can reach it; the minisv2 tunnel sends bingo.dkb.lol here
     ports:
       - "127.0.0.1:3030:3000"
-    # Suggested and approved squares live here, so they survive rebuilds
+    # The database (data/bingo.db) lives here, so it survives rebuilds
     volumes:
-      - ./data:/app/data
+      - /DATA/AppData/Dashcam-bingo/data:/app/data
+
+# What the CasaOS dashboard shows; Open goes to the public site, since the port is only open to this box
+x-casaos:
+  main: app
+  title:
+    en_us: Dashcam Bingo
+  description:
+    en_us: Bingo for Aussie dashcam videos, played together in rooms.
+  tagline:
+    en_us: Spot it, count it, bingo
+  category: Entertainment
+  author: self
+  icon: https://bingo.dkb.lol/icons/icon-192.png
+  scheme: https
+  hostname: bingo.dkb.lol
+  port_map: "443"
+  index: /

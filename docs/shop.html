@@ -43,6 +43,19 @@
         <p class="email-message error" id="shopMessage" role="status" hidden></p>
 
         <div id="rollSection">
+            <!-- Seven stops for coming back on days in a row; the last pays most -->
+            <section class="board-panel daily-panel">
+                <div class="daily-head">
+                    <div class="pity-words">
+                        <span class="stat-label">Daily reward</span>
+                        <strong class="pity-title" id="dailyTitle"></strong>
+                    </div>
+                    <button class="btn btn-primary" id="dailyButton" type="button"></button>
+                </div>
+                <ol class="daily-steps" id="dailySteps" aria-label="Daily reward stops"></ol>
+                <p class="admin-hint daily-note" id="dailyNote"></p>
+            </section>
+
             <!-- How close the next guaranteed epic is -->
             <section class="board-panel pity-banner">
                 <div class="pity-words">
@@ -63,14 +76,23 @@
                 </div>
                 <div class="shop-side">
                     <h3 class="shop-heading">Skin crate</h3>
-                    <p class="admin-hint">A skin for a random card. A card's first skin goes straight on, only you see your skins, and a repeat gives coins back.</p>
+                    <p class="admin-hint">A skin for a random card. A card's first skin goes straight on, only you see your skins (unless you showcase that card on your profile), and a repeat gives coins back.</p>
                     <ul class="shop-odds" id="odds" aria-label="Odds"></ul>
+                    <p class="admin-hint">Want one skin in particular? <a href="/cards">Buy it from its card</a>.</p>
                 </div>
                 <div class="shop-action">
                     <button class="btn btn-primary shop-roll-button" id="rollButton" type="button">Roll</button>
                     <p class="admin-hint" id="rollNote" hidden></p>
                     <div class="shop-result" id="rollResult" aria-live="polite"></div>
                 </div>
+            </section>
+
+            <!-- Bought once, worn in a slot: frames, titles, banners, celebrations and stamps; reaction packs are just owned -->
+            <section class="board-panel shop-extras">
+                <h3 class="shop-heading">Extras</h3>
+                <p class="admin-hint">Frames, titles and banners show on your profile and next to your name. Reactions and celebrations show in rooms, and stamps only on your own card. Anything you buy goes straight on if nothing's in that slot.</p>
+                <p class="email-message error" id="extrasMessage" role="status" hidden></p>
+                <div id="extras"></div>
             </section>
         </div>
     </main>

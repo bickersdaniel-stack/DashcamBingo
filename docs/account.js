@@ -1,6 +1,7 @@
 // Your coins and picture on the right of the top bar, for the pages around the game (leaderboard, cards, shop,
 // admin). The picture opens the same menu as in the lobby, without the lobby's suggestion and achievement dialogs
 import { coinsText, showNewSkins, signedInWith, winsText } from "./nav.js";
+import { openProfile } from "./profile.js";
 
 const $ = id => document.getElementById(id);
 const icon = path => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
@@ -35,6 +36,10 @@ const menu = `
                 Custom colour
             </label>
             <div class="menu-actions">
+                <button class="menu-item" id="profileButton" type="button">
+                    ${icon("M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z")}
+                    My profile
+                </button>
                 <a class="menu-item" id="manageLink" href="/admin" hidden>
                     ${icon("M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z")}
                     <span id="manageLabel">Manage cards</span>
@@ -71,6 +76,10 @@ async function showAccount() {
         $("accountButton").setAttribute("aria-expanded", open);
     };
     $("accountButton").addEventListener("click", () => setOpen($("accountPanel").hidden));
+    $("profileButton").addEventListener("click", () => {
+        setOpen(false);
+        openProfile(me.id);
+    });
     // The path, not the target: the theme button redraws itself, so its clicked icon is gone by now
     document.addEventListener("click", event => event.composedPath().includes($("account")) || setOpen(false));
     document.addEventListener("keydown", event => event.key === "Escape" && setOpen(false));

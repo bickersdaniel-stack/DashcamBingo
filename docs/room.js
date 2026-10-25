@@ -3,6 +3,7 @@ import { io } from "/socket.io/socket.io.esm.min.js";
 import { drawBoard, captureScreenshot, setTheme, pickColour, presetColours, load, save } from "./core.js";
 import { cardRow, playerRow } from "./board.js";
 import { fillPlayCard, wearSkin } from "./playcard.js";
+import { avatarOf, openProfile, profileLink } from "./profile.js";
 import { setUpLayout, useLayout } from "./layout.js";
 import { countLines } from "./shared/lines.js";
 import { parseYouTubeLink } from "./youtube.js";
@@ -13,6 +14,13 @@ const code = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})$/)?.[1].toUpperCase
 const meResponse = await fetch("/api/me");
 const me = meResponse.ok ? await meResponse.json() : null;
 const signInOptions = me ? {} : await meResponse.json().catch(() => ({})); // Which ways to sign in are set up
+// Signing up from an invite link often detours (a new Discord account lands in the Discord app), and people come back
+// through the front page. The room they were invited to is remembered on this device for an hour, so go there instead
+const [invitedRoom, invitedAt] = (load("invitedTo") ?? "").split(" ");
+if (me && !code && Date.now() - Number(invitedAt) < 60 * 60_000) {
+    location.replace(`/r/${invitedRoom}`);
+    await new Promise(() => {}); // Stop here, so the lobby and its welcome don't flash up first
+}
 const listNames = new Intl.ListFormat("en-AU", { type: "conjunction" });
 let state = null;         // What the server last said about the room
 let marked = new Set();   // My marked squares
@@ -32,6 +40,8 @@ const viewers = new Map(); // Host: viewer's socket id -> their connection
 let watchPeer = null;      // Viewer: the connection to the host
 let watchingFrom = null;   // Viewer: the host's socket id
 const departed = new Map(); // People who left the room, so their old feed items keep their names
+let sendReaction = null;    // Puts my emoji on a feed item, or takes it off
+let pickingFor = null;      // The feed item whose emoji picker is open
 // Host quality: YouTube + capture stay at this size; the iframe is CSS-scaled to the frame
 const qualities = {
     auto: { width: 1280, height: 720, yt: "default" },
@@ -55,8 +65,10 @@ if (me) {
 }
 
 if (!me) {
+    if (code) save("invitedTo", `${code} ${Date.now()}`);
     showSignIn();
 } else if (code) {
+    save("invitedTo", "");
     joinRoom();
 } else {
     showLobby();
@@ -118,7 +130,7 @@ function showLobby() {
         if (text && !video) return showError("That doesn't look like a YouTube link. Leave it empty to add a video later.", "setupError");
         if (!showPackTotal()) return;
         $("createButton").disabled = true;
-        const payload = { rerolls: Number($("roomRerolls").value), packs: chosenPacks() };
+        const payload = { rerolls: Number($("roomRerolls").value), mode: $("roomMode").value, packs: chosenPacks() };
         if (video) Object.assign(payload, { videoId: video.id, start: video.start });
         socket.timeout(5000).emit("room:create", payload, (timedOut, result) => {
             if (result?.code) return location.assign(`/r/${result.code}`);
@@ -151,6 +163,7 @@ function showLobby() {
 
 function joinRoom() {
     const socket = connect();
+    sendReaction = (eventId, emoji) => socket.emit("event:react", { eventId, emoji });
 
     // Also runs after a dropped connection comes back, which sends the whole room again
     socket.on("connect", () => socket.emit("room:join", { code }, ({ error }) => {
@@ -161,6 +174,10 @@ function joinRoom() {
     }));
     socket.on("room:state", newState => {
         const previousRound = state?.round.number;
+        // A new round while you're here: the card you had goes in Bingo cards before it's redrawn (unless it's empty)
+        if (previousRound && newState.round.number > previousRound && marked.size) {
+            captureScreenshot({ title: `Round ${previousRound}`, note: "Round ended", bingo: countLines(marked) > 0 });
+        }
         state = newState;
         videoSeenAt = Date.now();
         showRoom(socket);
@@ -210,6 +227,13 @@ function joinRoom() {
         showFeed();
         if (event.type === "spot" && !(event.cleared ?? []).length) pulse(event);
         if (event.type === "win") showMiniBoard(); // A bingo (or one taken back) changes the wins
+        if (i === -1 && event.celebration) celebrate(event.celebration);
+    });
+    socket.on("event:reactions", ({ id, reactions }) => {
+        const event = state?.events.find(e => e.id === id);
+        if (!event) return;
+        event.reactions = reactions;
+        showFeed();
     });
     socket.on("video:update", video => {
         if (!state) return;
@@ -234,8 +258,8 @@ function joinRoom() {
         showMyCoins(achievement.total);
         showAchievementToast(achievement);
     });
-    socket.on("packs:update", packs => {
-        if (state) state.packs = packs;
+    socket.on("deck:update", ({ mode, packs }) => {
+        if (state) Object.assign(state, { mode, packs });
     });
     socket.on("rtc:signal", ({ from, data }) => {
         if (shareStream && data?.type === "hello") return sendStream(socket, from);
@@ -286,14 +310,14 @@ function joinRoom() {
     document.querySelectorAll(".open-settings").forEach(button => button.addEventListener("click", async () => {
         setPanelOpen("room", false);
         $("settingsForm").prepend($("roomOptions"));
-        await fillRoomOptions(state.packs, state.rerolls ?? 0);
+        await fillRoomOptions({ mode: state.mode.id, packs: state.packs }, state.rerolls ?? 0);
         $("settingsDialog").showModal();
     }));
     $("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
     $("settingsForm").addEventListener("submit", event => {
         event.preventDefault();
         if (!showPackTotal()) return;
-        socket.emit("host:packs", { packs: chosenPacks() });
+        socket.emit("host:deck", { mode: $("roomMode").value, packs: chosenPacks() });
         socket.emit("host:rerolls", { rerolls: Number($("roomRerolls").value) });
         $("settingsDialog").close();
     });
@@ -316,7 +340,8 @@ function joinRoom() {
 function showRoom(socket) {
     show("roomGrid");
     $("roomCode").textContent = state.code;
-    $("roundNumber").textContent = `Round ${state.round.number}`;
+    const mode = state.round.mode;
+    $("roundNumber").textContent = mode && mode.id !== "normal" ? `Round ${state.round.number} · ${mode.name}` : `Round ${state.round.number}`;
 
     marked = new Set(state.card.counts.flatMap((count, index) => count > 0 ? [index] : []));
     bestLines = state.card.bestLines; // A refresh doesn't screenshot a line you already had
@@ -337,6 +362,8 @@ function showRoom(socket) {
         showReroll();
     }, state.card.notes, state.card.counts);
     [...$("bingoCard").children].forEach((cell, i) => wearSkin(cell, state.card.skins?.[i])); // Only you see your skins
+    $("bingoCard").classList.remove(...[...$("bingoCard").classList].filter(name => name.startsWith("stamp"))); // And your stamp
+    if (state.stamp) $("bingoCard").classList.add("stamped", `stamp-${state.stamp}`);
     $("bingoAlert").hidden = countLines(marked) === 0;
     showReroll();
     showRerollLock();
@@ -360,7 +387,7 @@ function checkBingo() {
     $("bingoAlert").hidden = lines === 0;
     if (lines > bestLines) {
         bestLines = lines;
-        captureScreenshot();
+        captureScreenshot({ title: `Bingo · Round ${state.round.number}` });
     }
 }
 
@@ -377,6 +404,8 @@ function showVideo(socket) {
     $("roomVideoSection").hidden = !isHost || withVideo;
     if (isHost) fillLockedLink();
     arrange(withVideo, isHost);
+    // Now playing sits in the video tile's title bar, or the card's while there's no video tile (no stream to watch)
+    (withVideo ? $("videoLabel") : $("roundNumber")).after($("nowPlaying"));
     if (hosting) startPlayer(socket, state.round.video);
     else stopPlayer();
     if (shareStream) cropShare();
@@ -681,9 +710,12 @@ function replay(event) {
 }
 
 // Players see where the host's video is up to, counting on between the host's reports
+// For everyone but the host (who has their controls there), in place of "Video" in the video tile's title bar
 function showNowPlaying() {
     const video = state.round.video;
-    $("nowPlaying").hidden = !video || state.hostId === me.id;
+    const isHost = state.hostId === me.id;
+    $("nowPlaying").hidden = !video || isHost;
+    $("videoLabel").hidden = !$("nowPlaying").hidden || (isHost && (!!video || !$("liveVideo").hidden));
     if ($("nowPlaying").hidden) return;
     $("nowPlayingTitle").textContent = video.title || "the host's video";
     $("nowPlayingTime").textContent = formatTime(Math.floor(videoSecondsNow()));
@@ -762,7 +794,7 @@ function showPlayers() {
     const players = [...state.players].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
     $("playerList").replaceChildren(...players.map(player => {
         const row = el("li", player.connected ? "person" : "person away");
-        row.append(avatar(player), el("span", "person-name", player.name));
+        row.append(avatar(player), profileLink(player, "person-name"));
         if (player.id === state.hostId) row.append(Object.assign(el("span", "host-crown", "👑"), { title: "Host" }));
         if (player.oneAway) row.append(el("span", "badge", "1 away!"));
         row.append(
@@ -773,36 +805,95 @@ function showPlayers() {
     }));
 }
 
+// This round's feed, then the last few rounds', each under its number once there's more than one
 function showFeed() {
-    const items = [...state.events].reverse().map(event => {
-        const still = event.type === "spot" ? event.userIds.filter(id => !(event.cleared ?? []).includes(id)) : null;
-        const ids = event.type === "spot" ? (still.length ? still : event.userIds) : [event.userId];
-        const names = listNames.format(ids.map(id => playerById(id).name));
-        const text = el("span", "feed-text");
-        if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
-        else if (event.type === "host") text.append(`👑 ${names} is now the host`);
-        else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
-        else if (event.type === "achievement") text.append(`🏆 ${names} unlocked `, el("em", "", event.name));
-        else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
-
-        const avatars = el("span", "feed-avatars");
-        avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
-        const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
-        if ((still && still.length === 0) || event.undone) item.classList.add("undone");
-        // The host can click a moment from this video to watch it again, from 5 seconds before
-        const replayable = playerVideoId !== null && event.videoId === playerVideoId;
-        const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
-        if (replayable) {
-            time.type = "button";
-            time.title = "Replay from 5 seconds before";
-            item.classList.add("replayable");
-            item.addEventListener("click", () => replay(event));
-        }
-        item.append(avatars, text, time);
-        return item;
+    const rounds = [{ number: state.round.number, events: state.events, current: true }, ...(state.pastRounds ?? [])];
+    const items = rounds.flatMap(round => {
+        const rows = [...round.events].reverse().map(event => feedItem(event, round.current));
+        const show = rounds.length > 1 && (rows.length || round.current);
+        return show ? [el("li", "feed-round", round.current ? `Round ${round.number} · now` : `Round ${round.number}`), ...rows] : rows;
     });
     $("feedList").replaceChildren(...items);
     $("feedEmpty").hidden = items.length > 0;
+}
+
+// One feed item; only this round's take new emojis, since the server keeps reactions for this round alone
+function feedItem(event, current) {
+    const still = event.type === "spot" ? event.userIds.filter(id => !(event.cleared ?? []).includes(id)) : null;
+    const ids = event.type === "spot" ? (still.length ? still : event.userIds) : [event.userId];
+    const names = listNames.format(ids.map(id => playerById(id).name));
+    const text = el("span", "feed-text");
+    if (event.type === "spot") text.append(`${names} spotted `, el("em", "", event.phrase));
+    else if (event.type === "host") text.append(`👑 ${names} is now the host`);
+    else if (event.type === "left") text.append(`👋 ${event.name} left the room`);
+    else if (event.type === "achievement") text.append(`🏆 ${names} unlocked `, el("em", "", event.name));
+    else text.append(`🎉 ${names} got BINGO${event.lines > 1 ? ` (${event.lines} lines)` : ""}`);
+
+    const avatars = el("span", "feed-avatars");
+    avatars.append(...ids.map(id => avatar(event.type === "left" ? event : playerById(id))));
+    const item = el("li", event.type === "win" ? "feed-item win" : "feed-item");
+    if ((still && still.length === 0) || event.undone) item.classList.add("undone");
+    // The host can click a moment from this video to watch it again, from 5 seconds before
+    const replayable = playerVideoId !== null && event.videoId === playerVideoId;
+    const time = el(replayable ? "button" : "span", replayable ? "feed-time replay" : "feed-time", formatTime(event.videoTime));
+    if (replayable) {
+        time.type = "button";
+        time.title = "Replay from 5 seconds before";
+        item.classList.add("replayable");
+        item.addEventListener("click", () => replay(event));
+    }
+    item.append(avatars, text, time);
+    if (["spot", "win", "achievement"].includes(event.type)) item.append(...reactionParts(event, current));
+    return item;
+}
+
+// A + beside a feed item's time that opens the emojis I can use, and under its words the ones people have put on it
+// (mine pressed, to take back off)
+function reactionParts(event, current) {
+    const row = el("div", "feed-reactions");
+    const chip = (emoji, label, className = "reaction") => {
+        const button = el("button", className, label);
+        button.type = "button";
+        button.disabled = !current;
+        button.addEventListener("click", click => {
+            click.stopPropagation(); // Not the host's replay
+            pickingFor = null;
+            sendReaction(event.id, emoji);
+        });
+        return button;
+    };
+    for (const [emoji, ids] of Object.entries(event.reactions ?? {})) {
+        const button = chip(emoji, `${emoji} ${ids.length}`);
+        button.setAttribute("aria-pressed", ids.includes(me.id));
+        button.title = listNames.format(ids.map(id => playerById(id).name));
+        row.append(button);
+    }
+    if (!current) return row.hasChildNodes() ? [row] : []; // An earlier round: what people put, no more
+    const add = el("button", "reaction react-add", pickingFor === event.id ? "×" : "☺+");
+    add.type = "button";
+    add.ariaLabel = pickingFor === event.id ? "Close emojis" : "Add an emoji";
+    add.setAttribute("aria-expanded", pickingFor === event.id);
+    add.addEventListener("click", click => {
+        click.stopPropagation();
+        pickingFor = pickingFor === event.id ? null : event.id;
+        showFeed();
+    });
+    if (pickingFor === event.id) row.append(...state.reactions.map(emoji => chip(emoji, emoji, "reaction react-pick")));
+    return row.hasChildNodes() ? [add, row] : [add];
+}
+
+// Someone's bingo celebration over everyone's screen for a few seconds: their pieces raining down (or bursting out)
+function celebrate({ id, pieces }) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const layer = el("div", `celebration celebrate-${id}`);
+    layer.ariaHidden = "true";
+    for (let i = 0; i < 40; i++) {
+        const piece = el("span", "", pieces[i % pieces.length]);
+        piece.style.cssText = `--x: ${Math.random() * 100}%; --delay: ${Math.random() * 0.8}s; --spin: ${Math.round(Math.random() * 720 - 360)}deg; --angle: ${Math.round(Math.random() * 360)}deg; --hue: ${Math.round(Math.random() * 360)}`;
+        layer.append(piece);
+    }
+    document.body.append(layer);
+    setTimeout(() => layer.remove(), 3500);
 }
 
 function showScoreboard(summary) {
@@ -814,7 +905,7 @@ function showScoreboard(summary) {
             ? `🎉 BINGO${player.bingoAt !== null ? ` at ${formatTime(player.bingoAt)}` : ""}${player.lines > 1 ? ` · ${player.lines} lines` : ""}`
             : player.oneAway ? "1 away" : `${player.marked}/24 marked`;
         const row = el("li", player.lines > 0 ? "score winner" : "score");
-        row.append(el("span", "score-rank", String(i + 1)), avatar(player), el("span", "person-name", player.name),
+        row.append(el("span", "score-rank", String(i + 1)), avatar(player), profileLink(player, "person-name"),
             el("span", "score-result", result), Object.assign(el("span", "wins", `🏆 ${player.wins}`), { title: "Wins so far" }));
         return row;
     }));
@@ -848,7 +939,7 @@ function playerById(id) {
 }
 
 function avatar(player) {
-    return Object.assign(el("img", "avatar"), { src: player.avatar, alt: "" });
+    return avatarOf(player);
 }
 
 function el(tag, className, text) {
@@ -962,6 +1053,10 @@ function setUpSuggestions() {
         setMenuOpen(false);
         showAchievements();
     });
+    $("profileButton").addEventListener("click", () => {
+        setMenuOpen(false);
+        openProfile(me.id);
+    });
     $("suggestButton").addEventListener("click", async () => {
         setMenuOpen(false);
         message("suggestMessage", "", true);
@@ -986,22 +1081,40 @@ function setUpSuggestions() {
 }
 
 // The packs and rerolls fields, used by the setup screen and by the host's Room settings
-let packInfo = []; // Each pack with how many cards it holds
+let packInfo = []; // Each pack with its game modes and how many cards it holds
+let modeInfo = []; // Each game mode with how many cards its packs hold
+let deckCards = []; // Every card and its packs, to count a card in two ticked packs once
 
+// The game mode first, then the packs holding its cards. chosen: the room's mode and packs, or null for a new room
 async function fillRoomOptions(chosen, rerolls) {
     const { data } = await api("GET", "/api/cards");
     packInfo = data.packs ?? [];
-    $("packChoices").replaceChildren(...packInfo.map(pack => {
+    modeInfo = data.modes ?? [];
+    deckCards = data.cards ?? [];
+    $("roomMode").replaceChildren(...modeInfo.map(mode => Object.assign(
+        new Option(`${mode.name} · ${mode.count} card${mode.count === 1 ? "" : "s"}${mode.count < 24 ? " (needs 24)" : ""}`, mode.id),
+        { disabled: mode.count < 24 })));
+    $("roomMode").value = modeInfo.some(mode => mode.id === chosen?.mode) ? chosen.mode : "normal"; // Its mode may have been deleted
+    $("roomMode").onchange = () => showModePacks(null);
+    showModePacks(chosen?.packs ?? null);
+    $("roomRerolls").value = String(rerolls);
+}
+
+// Only the packs ticked into the chosen mode. Normal starts with the packs that are on by default, other modes with
+// all of theirs
+function showModePacks(chosen) {
+    const mode = $("roomMode").value;
+    $("packChoices").replaceChildren(...packInfo.filter(pack => pack.modes.includes(mode) && pack.count > 0).map(pack => {
+        const count = pack.count;
         const choice = el("label", "pack-choice");
-        const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : pack.on });
+        const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : mode !== "normal" || pack.on });
         const words = el("span", "pack-words");
-        words.append(el("strong", "", pack.name), el("span", "pack-count", `${pack.count} card${pack.count === 1 ? "" : "s"}`));
+        words.append(el("strong", "", pack.name), el("span", "pack-count", `${count} card${count === 1 ? "" : "s"}`));
         if (pack.description) words.append(el("span", "pack-description", pack.description));
         choice.append(box, words);
         return choice;
     }));
     $("packChoices").onchange = showPackTotal;
-    $("roomRerolls").value = String(rerolls);
     showPackTotal();
 }
 
@@ -1009,7 +1122,8 @@ const chosenPacks = () => [...$("packChoices").querySelectorAll("input:checked")
 
 // A card has 24 squares, so Create room and Save wait until the ticked packs hold that many
 function showPackTotal() {
-    const total = packInfo.filter(pack => chosenPacks().includes(pack.id)).reduce((sum, pack) => sum + pack.count, 0);
+    const chosen = chosenPacks();
+    const total = deckCards.filter(card => card.packs.some(id => chosen.includes(id))).length;
     const enough = total >= 24;
     $("packTotal").textContent = enough ? `${total} cards to deal from` : `Only ${total} cards. Pick packs with at least 24.`;
     $("packTotal").classList.toggle("error", !enough);

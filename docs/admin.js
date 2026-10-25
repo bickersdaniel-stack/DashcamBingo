@@ -1,16 +1,21 @@
-// Admin page: review suggested squares, edit every card and its description, sort cards into packs, and manage people
+// Admin page: review suggested squares, edit every card and its description, put cards in packs and packs in game
+// modes, manage people, and set how many coins players earn
 const $ = id => document.getElementById(id);
 const pageSize = 25;
 const pages = { card: 1, user: 1 }; // The page each long list is on
+const coinKeys = ["bingoCoins", "coinsPerRound", "countCoinsPerDay"]; // Also the ids of their inputs
 let packs = [];
+let modes = [];
 let cards = [];
 let users = [];
 
 document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
-["cardSearch", "cardPackFilter", "cardSort"].forEach(id => $(id).addEventListener("input", () => {
+["cardSearch", "cardPackFilter", "cardModeFilter", "cardSort"].forEach(id => $(id).addEventListener("input", () => {
     pages.card = 1;
     showCards();
 }));
+// A tick-box dropdown closes when you click anywhere else
+document.addEventListener("click", event => document.querySelectorAll(".tick-dropdown[open]").forEach(menu => menu.contains(event.target) || menu.removeAttribute("open")));
 $("userSearch").addEventListener("input", () => {
     pages.user = 1;
     showUsers();
@@ -18,7 +23,9 @@ $("userSearch").addEventListener("input", () => {
 
 $("newCardForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const result = await api("POST", "/api/admin/cards", { text: $("newCardText").value, description: $("newCardDescription").value, pack: $("newCardPack").value });
+    const result = await api("POST", "/api/admin/cards", {
+        text: $("newCardText").value, description: $("newCardDescription").value, packs: ticked($("newCardPacks"))
+    });
     if (!done(result, "Card added.")) return;
     $("newCardText").value = $("newCardDescription").value = "";
     load();
@@ -26,26 +33,53 @@ $("newCardForm").addEventListener("submit", async event => {
 
 $("newPackForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const result = await api("POST", "/api/admin/packs", { name: $("newPackName").value, description: $("newPackDescription").value, on: $("newPackOn").checked });
+    const result = await api("POST", "/api/admin/packs", {
+        name: $("newPackName").value, description: $("newPackDescription").value, on: $("newPackOn").checked, modes: ticked($("newPackModes"))
+    });
     if (!done(result, "Pack added.")) return;
     $("newPackName").value = $("newPackDescription").value = "";
     $("newPackOn").checked = false;
     load();
 });
 
+$("newModeForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = await api("POST", "/api/admin/modes", { name: $("newModeName").value, description: $("newModeDescription").value });
+    if (!done(result, "Mode added. Tick packs into it on the Packs tab.")) return;
+    $("newModeName").value = $("newModeDescription").value = "";
+    load();
+});
+
+showSaveWhenEdited($("coinsForm"), $("coinsSave"));
+$("coinsForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = await api("PATCH", "/api/admin/settings", Object.fromEntries(coinKeys.map(key => [key, $(key).valueAsNumber])));
+    if (done(result, "Saved.")) load();
+});
+
 async function load() {
-    const [all, waiting, people] = await Promise.all([api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users")]);
+    const [all, waiting, people, settings] = await Promise.all([
+        api("GET", "/api/admin/cards"), api("GET", "/api/admin/suggestions"), api("GET", "/api/admin/users"), api("GET", "/api/admin/settings")
+    ]);
     if (!all.ok) return message(all.data.error, false);
-    ({ packs, cards } = all.data);
+    if (!people.ok) return message(people.data.error, false);
+    ({ packs, modes, cards } = all.data);
     users = people.data;
-    fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
+    $("newCardPacks").replaceWith(Object.assign(tickDropdown("packs", packs, [firstOnPack()]), { id: "newCardPacks" }));
+    $("newPackModes").replaceWith(Object.assign(tickDropdown("modes", modes, ["normal"]), { id: "newPackModes" }));
     const filter = $("cardPackFilter").value;
     $("cardPackFilter").replaceChildren(new Option("All packs", "all"), ...packs.map(pack => new Option(pack.name, pack.id)));
     $("cardPackFilter").value = packs.some(pack => pack.id === filter) ? filter : "all";
+    const modeFilter = $("cardModeFilter").value;
+    $("cardModeFilter").replaceChildren(new Option("All modes", "all"), ...modes.map(mode => new Option(mode.name, mode.id)));
+    $("cardModeFilter").value = modes.some(mode => mode.id === modeFilter) ? modeFilter : "all";
+
     showSuggestions(waiting.data.pending ?? []);
     showCards();
     showPacks();
+    showModes();
     showUsers();
+    showCoins(settings.data);
     return waiting.data.pending?.length ?? 0;
 }
 
@@ -73,9 +107,12 @@ const rate = card => card.dealt >= 10 ? card.spotted / card.dealt : null;
 function showCards() {
     const search = $("cardSearch").value.trim().toLowerCase();
     const filter = $("cardPackFilter").value;
+    const modeFilter = $("cardModeFilter").value;
     const sort = $("cardSort").value;
+    const modePacks = packs.filter(pack => pack.modes.includes(modeFilter)).map(pack => pack.id);
     const shown = cards
-        .filter(card => (filter === "all" || card.pack === filter) && (`${card.text} ${card.description}`).toLowerCase().includes(search))
+        .filter(card => (filter === "all" || card.packs.includes(filter)) && (modeFilter === "all" || card.packs.some(id => modePacks.includes(id)))
+            && (`${card.text} ${card.description}`).toLowerCase().includes(search))
         .sort((a, b) => {
             if (sort === "az") return a.text.localeCompare(b.text);
             const [ra, rb] = [rate(a), rate(b)];
@@ -89,12 +126,25 @@ function showCards() {
         const item = el("li", "item admin-row");
         const text = input(card.text, 60, "Card wording");
         const description = textarea(card.description, "Description (optional)");
-        const pack = fillPackSelect(el("select", "quality-select pack-select"), card.pack);
-        const r = rate(card);
-        const stats = el("span", "admin-stats", r === null ? "Not enough games yet" : `Spotted ${Math.round(r * 100)}%`);
-        stats.title = `Marked on ${card.spotted} of the ${card.dealt} cards it was dealt on`;
+        const cardPacks = packTicks(card);
+        const counted = Object.assign(input(String(card.counted ?? 0), 6, `Counted for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const spotted = Object.assign(input(String(card.spotted ?? 0), 6, `Marked deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        const dealt = Object.assign(input(String(card.dealt ?? 0), 6, `Deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
+        counted.classList.add("wins-input");
+        spotted.classList.add("wins-input");
+        dealt.classList.add("wins-input");
+        const stats = el("span", "admin-counts");
+        const countedLabel = el("label", "check-label", "Counted ");
+        const markedLabel = el("label", "check-label", "Marked ");
+        countedLabel.append(counted);
+        markedLabel.append(spotted, " / ", dealt);
+        stats.append(countedLabel, markedLabel);
+        stats.title = "Counted is every sighting. Marked / dealt is how often it was on a card and got marked.";
         const save = button("Save", "btn btn-primary", async () => {
-            const result = await api("PATCH", `/api/admin/cards/${card.id}`, { text: text.value, description: description.value, pack: pack.value });
+            const result = await api("PATCH", `/api/admin/cards/${card.id}`, {
+                text: text.value, description: description.value,
+                counted: Number(counted.value), spotted: Number(spotted.value), dealt: Number(dealt.value)
+            });
             if (done(result, "Saved.")) load();
         });
         const remove = button("Delete", "link-button", async () => {
@@ -102,7 +152,62 @@ function showCards() {
             if (done(await api("DELETE", `/api/admin/cards/${card.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(text, description, pack, stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
+        item.append(text, description, cardPacks, stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
+        return item;
+    }));
+}
+
+// The packs a card is in, as a tick-box dropdown. Each tick saves straight away, without the row's Save, so filling a
+// pack from the Cards tab is quick. The first pack is the one the card shows
+function packTicks(card) {
+    const menu = tickDropdown("packs", packs, card.packs);
+    const stay = event => event.stopPropagation(); // So the row doesn't think it has unsaved edits
+    menu.addEventListener("input", stay);
+    menu.addEventListener("change", async event => {
+        stay(event);
+        const result = await api("PATCH", `/api/admin/cards/${card.id}`, { packs: ticked(menu) });
+        if (done(result, `Saved the packs for "${card.text}".`)) card.packs = result.data.packs;
+        menu.replaceWith(packTicks(card)); // Redrawn either way: a refused change goes back
+    });
+    return menu;
+}
+
+// A dropdown of tick boxes: its button names what's ticked, and the boxes open below it
+function tickDropdown(what, options, chosen) {
+    const menu = el("details", "tick-dropdown");
+    const summary = el("summary", "quality-select");
+    summary.ariaLabel = `Choose ${what}`;
+    const list = el("div", "tick-menu");
+    list.append(...options.map(option => {
+        const label = el("label", "check-label");
+        label.append(Object.assign(document.createElement("input"), { type: "checkbox", value: option.id, checked: chosen.includes(option.id) }), ` ${option.name}`);
+        return label;
+    }));
+    const name = () => summary.textContent = options.filter(option => ticked(menu).includes(option.id)).map(option => option.name).join(", ") || `No ${what}`;
+    menu.append(summary, list);
+    list.addEventListener("change", name);
+    name();
+    return menu;
+}
+
+const ticked = menu => [...menu.querySelectorAll("input:checked")].map(box => box.value);
+
+function showModes() {
+    $("modeList").replaceChildren(...modes.map(mode => {
+        const item = el("li", "item admin-row");
+        const name = input(mode.name, 30, "Mode name");
+        const description = input(mode.description, 140, "Description (optional)");
+        const save = button("Save", "btn btn-primary", async () => {
+            const result = await api("PATCH", `/api/admin/modes/${mode.id}`, { name: name.value, description: description.value });
+            if (done(result, "Saved.")) load();
+        });
+        const remove = mode.id === "normal" ? el("span", "") : button("Delete", "link-button", async () => {
+            if (!confirm(`Delete the "${mode.name}" mode? Its packs stay, in their other modes.`)) return;
+            if (done(await api("DELETE", `/api/admin/modes/${mode.id}`), "Deleted.")) load();
+        });
+        showSaveWhenEdited(item, save);
+        const count = `${mode.count} card${mode.count === 1 ? "" : "s"}${mode.count < 24 ? " · needs 24" : ""}`;
+        item.append(name, description, el("span", "admin-stats", count), save, remove);
         return item;
     }));
 }
@@ -115,8 +220,9 @@ function showPacks() {
         const on = Object.assign(document.createElement("input"), { type: "checkbox", checked: pack.on });
         const onLabel = el("label", "check-label");
         onLabel.append(on, " On by default");
+        const packModes = tickDropdown("modes", modes, pack.modes);
         const save = button("Save", "btn btn-primary", async () => {
-            const result = await api("PATCH", `/api/admin/packs/${pack.id}`, { name: name.value, description: description.value, on: on.checked });
+            const result = await api("PATCH", `/api/admin/packs/${pack.id}`, { name: name.value, description: description.value, on: on.checked, modes: ticked(packModes) });
             if (done(result, "Saved.")) load();
         });
         const remove = button("Delete", "link-button", async () => {
@@ -124,7 +230,7 @@ function showPacks() {
             if (done(await api("DELETE", `/api/admin/packs/${pack.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(name, description, onLabel, el("span", "admin-stats", `${pack.count} card${pack.count === 1 ? "" : "s"}`), save, remove);
+        item.append(name, description, packModes, onLabel, el("span", "admin-stats", `${pack.count} card${pack.count === 1 ? "" : "s"}`), save, remove);
         return item;
     }));
 }
@@ -143,7 +249,7 @@ function showUsers() {
             if (done(await api("PATCH", `/api/admin/users/${encodeURIComponent(user.id)}`, body), text)) load();
         };
         const who = el("span", "user-who");
-        const seen = user.seenAt ? `last played ${new Date(user.seenAt).toLocaleDateString()}` : "not played since this update";
+        const seen = user.seenAt ? `last seen ${new Date(user.seenAt).toLocaleDateString()}` : "not seen since this update";
         who.append(el("strong", "", user.name), el("span", "item-by", `${signedInWith[user.via]} · ${seen}`));
         const tags = [user.owner ? "Owner" : user.admin && "Admin", user.blocked && "Blocked"].filter(Boolean);
         const wins = Object.assign(input(String(user.wins), 6, `Wins for ${user.name}`), { type: "number", min: 0, max: 100000 });
@@ -172,6 +278,11 @@ function showUsers() {
         }
         return item;
     }));
+}
+
+function showCoins(settings) {
+    for (const key of coinKeys) $(key).value = settings[key];
+    $("coinsSave").style.visibility = "hidden"; // Until one is edited again
 }
 
 // One page of a long list; the page stays in range when the list gets shorter

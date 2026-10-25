@@ -59,8 +59,7 @@
             <form class="admin-tools add" id="newCardForm">
                 <input class="link-input" id="newCardText" maxlength="60" placeholder="New card, e.g. Kangaroo on the road" autocomplete="off" aria-label="New card wording">
                 <textarea class="link-input" id="newCardDescription" maxlength="300" rows="1" placeholder="Description (optional)" aria-label="New card description"></textarea>
-                <select class="quality-select pack-select" id="newCardPack" aria-label="Pack for the new card"></select>
-                <span class="mode-ticks" id="newCardModes" role="group" aria-label="Game modes for the new card"></span>
+                <span id="newCardPacks"></span>
                 <button class="btn btn-primary" type="submit">Add card</button>
             </form>
             <div class="admin-tools">
@@ -79,10 +78,11 @@
         </section>
 
         <section class="admin-panel" id="packsPanel" role="tabpanel" hidden>
-            <p class="admin-hint">Hosts pick packs when they set up a room. Packs that are on by default start ticked, and the solo game uses them.</p>
+            <p class="admin-hint">Hosts pick a game mode when they set up a room, then which of its packs to deal from. Packs that are on by default start ticked in Normal, and the solo game uses them.</p>
             <form class="admin-tools add" id="newPackForm">
                 <input class="link-input" id="newPackName" maxlength="30" placeholder="New pack name" autocomplete="off" aria-label="New pack name">
                 <input class="link-input" id="newPackDescription" maxlength="140" placeholder="Description (optional)" autocomplete="off" aria-label="New pack description">
+                <span id="newPackModes"></span>
                 <label class="check-label"><input type="checkbox" id="newPackOn"> On by default</label>
                 <button class="btn btn-primary" type="submit">Add pack</button>
             </form>
@@ -90,7 +90,7 @@
         </section>
 
         <section class="admin-panel" id="modesPanel" role="tabpanel" hidden>
-            <p class="admin-hint">Hosts pick a game mode before their packs, and only cards ticked into that mode are dealt. Tick cards into modes on the Cards tab. A mode needs 24 cards to play, and Normal can be renamed but not deleted.</p>
+            <p class="admin-hint">Hosts pick a game mode, then which of its packs to deal from. Tick packs into modes on the Packs tab, and cards into packs on the Cards tab. A mode needs 24 cards to play, and Normal can be renamed but not deleted.</p>
             <form class="admin-tools add" id="newModeForm">
                 <input class="link-input" id="newModeName" maxlength="30" placeholder="New mode name" autocomplete="off" aria-label="New mode name">
                 <input class="link-input" id="newModeDescription" maxlength="140" placeholder="Description (optional)" autocomplete="off" aria-label="New mode description">

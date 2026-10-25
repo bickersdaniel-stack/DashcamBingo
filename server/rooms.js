@@ -2,7 +2,7 @@
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
 import { lookOf, reactionsOf, skinInfo, wornExtra } from "./shop.js";
-import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, modeTable, modesOf, packTable, removeWin, touchProfile, updateProfile } from "./store.js";
+import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, modePackIds, modeTable, packsOf, removeWin, touchProfile, updateProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -321,8 +321,9 @@ function startRound(room, video = null, replace = false) {
 // mid-room, the whole mode, then every card
 export function deckFor(room) {
     const all = cardTable.all();
-    const inMode = all.filter(card => modesOf(card).includes(room.mode ?? "normal"));
-    const inPacks = inMode.filter(card => room.packs.includes(card.pack));
+    const modePacks = modePackIds(room.mode ?? "normal");
+    const inMode = all.filter(card => packsOf(card).some(id => modePacks.includes(id)));
+    const inPacks = inMode.filter(card => packsOf(card).some(id => modePacks.includes(id) && room.packs.includes(id)));
     return [inPacks, inMode].find(deck => deck.length >= 24) ?? all;
 }
 
@@ -392,10 +393,11 @@ function shuffle(list, random = Math.random) {
     return out;
 }
 
-// The packs a host picked, if they exist and hold enough of the mode's cards to fill a card
+// The packs a host picked, if they're in the mode and hold enough cards between them to fill a card
 export function packsFrom(value, mode = "normal") {
     if (!Array.isArray(value)) return null;
-    const ids = [...new Set(value)].filter(id => typeof id === "string" && packTable.get(id));
+    const inMode = modePackIds(mode);
+    const ids = [...new Set(value)].filter(id => typeof id === "string" && inMode.includes(id));
     return cardsIn(ids, mode).length >= 24 ? ids : null;
 }
 

@@ -1081,14 +1081,16 @@ function setUpSuggestions() {
 }
 
 // The packs and rerolls fields, used by the setup screen and by the host's Room settings
-let packInfo = []; // Each pack with how many cards it holds in each game mode
-let modeInfo = []; // Each game mode with how many cards it holds
+let packInfo = []; // Each pack with its game modes and how many cards it holds
+let modeInfo = []; // Each game mode with how many cards its packs hold
+let deckCards = []; // Every card and its packs, to count a card in two ticked packs once
 
 // The game mode first, then the packs holding its cards. chosen: the room's mode and packs, or null for a new room
 async function fillRoomOptions(chosen, rerolls) {
     const { data } = await api("GET", "/api/cards");
     packInfo = data.packs ?? [];
     modeInfo = data.modes ?? [];
+    deckCards = data.cards ?? [];
     $("roomMode").replaceChildren(...modeInfo.map(mode => Object.assign(
         new Option(`${mode.name} · ${mode.count} card${mode.count === 1 ? "" : "s"}${mode.count < 24 ? " (needs 24)" : ""}`, mode.id),
         { disabled: mode.count < 24 })));
@@ -1098,12 +1100,12 @@ async function fillRoomOptions(chosen, rerolls) {
     $("roomRerolls").value = String(rerolls);
 }
 
-// Only packs with cards in the chosen mode, with how many of its cards each holds. Normal starts with the packs that
-// are on by default, other modes with every pack that has their cards
+// Only the packs ticked into the chosen mode. Normal starts with the packs that are on by default, other modes with
+// all of theirs
 function showModePacks(chosen) {
     const mode = $("roomMode").value;
-    $("packChoices").replaceChildren(...packInfo.filter(pack => pack.counts[mode] > 0).map(pack => {
-        const count = pack.counts[mode];
+    $("packChoices").replaceChildren(...packInfo.filter(pack => pack.modes.includes(mode) && pack.count > 0).map(pack => {
+        const count = pack.count;
         const choice = el("label", "pack-choice");
         const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : mode !== "normal" || pack.on });
         const words = el("span", "pack-words");
@@ -1120,8 +1122,8 @@ const chosenPacks = () => [...$("packChoices").querySelectorAll("input:checked")
 
 // A card has 24 squares, so Create room and Save wait until the ticked packs hold that many
 function showPackTotal() {
-    const mode = $("roomMode").value;
-    const total = packInfo.filter(pack => chosenPacks().includes(pack.id)).reduce((sum, pack) => sum + (pack.counts[mode] ?? 0), 0);
+    const chosen = chosenPacks();
+    const total = deckCards.filter(card => card.packs.some(id => chosen.includes(id))).length;
     const enough = total >= 24;
     $("packTotal").textContent = enough ? `${total} cards to deal from` : `Only ${total} cards. Pick packs with at least 24.`;
     $("packTotal").classList.toggle("error", !enough);

@@ -1,28 +1,20 @@
-// Admins add, edit and delete cards, sort them into packs and tick the game modes each is dealt in; hosts pick a mode,
-// then which of its packs their room deals from
+// Admins add, edit and delete cards, put them in packs (a card can be in several) and tick packs into game modes;
+// hosts pick a mode, then which of its packs their room deals from
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { cardTable, modesOf, modeTable, packTable, suggestionTable, transaction } from "./store.js";
+import { cardsIn, cardTable, modePackIds, modeTable, packModes, packsOf, packTable, suggestionTable, transaction } from "./store.js";
 import { adminOnly, cardProblem, json, signedIn, tidy, tidyLines } from "./suggestions.js";
 
 export const cards = Router();
 
-// Each pack with how many cards it holds, in all and in each game mode
+// Each pack with its game modes and how many cards it holds
 function packList() {
     const all = cardTable.all();
-    const modes = modeTable.all();
-    return packTable.all().map(pack => {
-        const inPack = all.filter(card => card.pack === pack.id);
-        const counts = Object.fromEntries(modes.map(mode => [mode.id, inPack.filter(card => modesOf(card).includes(mode.id)).length]));
-        return { ...pack, count: inPack.length, counts };
-    });
+    return packTable.all().map(pack => ({ ...pack, modes: packModes(pack), count: all.filter(card => packsOf(card).includes(pack.id)).length }));
 }
 
-// Each game mode with how many cards are in it
-function modeList() {
-    const all = cardTable.all();
-    return modeTable.all().map(mode => ({ ...mode, count: all.filter(card => modesOf(card).includes(mode.id)).length }));
-}
+// Each game mode with how many cards its packs hold between them
+const modeList = () => modeTable.all().map(mode => ({ ...mode, count: cardsIn(modePackIds(mode.id), mode.id).length }));
 
 // A field left out of an edit keeps its current value
 const field = (body, name, current, read = tidy) => body?.[name] === undefined ? current : read(body[name]);
@@ -37,12 +29,11 @@ function nameProblem(rows, what, { name, description }, ignoreId) {
 const packProblem = (pack, ignoreId) => nameProblem(packTable.all(), "pack", pack, ignoreId);
 export const modeProblem = (mode, ignoreId) => nameProblem(modeTable.all(), "mode", mode, ignoreId);
 
-// The game modes a card is ticked into: at least one, each a real mode, none twice
-export function modesProblem(modes) {
-    const ok = Array.isArray(modes) && modes.length > 0 && new Set(modes).size === modes.length
-        && modes.every(id => typeof id === "string" && modeTable.get(id));
-    return ok ? null : "Tick at least one game mode.";
-}
+// A list of ids picked from a table: at least one, each real, none twice
+const picked = (ids, rows) => Array.isArray(ids) && ids.length > 0 && new Set(ids).size === ids.length && ids.every(id => typeof id === "string" && rows.get(id));
+// The game modes a pack is ticked into, and the packs a card is in
+export const modesProblem = modes => picked(modes, modeTable) ? null : "Tick at least one game mode.";
+export const packsProblem = packs => picked(packs, packTable) ? null : "Tick at least one pack.";
 
 // What players need: the packs to pick from and the words on the cards (no stats)
 // rate: how often it's spotted when dealt, as a percentage, once it's been dealt 10 times
@@ -51,22 +42,22 @@ cards.get("/api/cards", signedIn, (req, res) => {
         packs: packList(),
         modes: modeList(),
         cards: cardTable.all().map(card => ({
-            id: card.id, text: card.text, description: card.description, pack: card.pack, modes: modesOf(card),
+            id: card.id, text: card.text, description: card.description, pack: card.pack, packs: packsOf(card),
             rate: card.dealt >= 10 ? Math.round(card.spotted / card.dealt * 100) : null
         }))
     });
 });
 
 cards.get("/api/admin/cards", adminOnly, (req, res) => {
-    res.json({ packs: packList(), modes: modeList(), cards: cardTable.all().map(card => ({ ...card, modes: modesOf(card) })) });
+    res.json({ packs: packList(), modes: modeList(), cards: cardTable.all().map(card => ({ ...card, packs: packsOf(card) })) });
 });
 
 cards.post("/api/admin/cards", adminOnly, json, (req, res) => {
-    const card = { text: tidy(req.body?.text), description: tidyLines(req.body?.description), pack: String(req.body?.pack ?? "") };
-    const modes = req.body?.modes ?? ["normal"];
-    const problem = cardProblem(card) ?? modesProblem(modes);
+    const packs = req.body?.packs;
+    const card = { text: tidy(req.body?.text), description: tidyLines(req.body?.description), pack: String(packs?.[0] ?? "") };
+    const problem = cardProblem(card) ?? packsProblem(packs);
     if (problem) return res.status(400).json({ error: problem });
-    const row = { id: randomUUID(), ...card, modes, by: null, at: Date.now(), dealt: 0, spotted: 0, counted: 0 };
+    const row = { id: randomUUID(), ...card, packs, by: null, at: Date.now(), dealt: 0, spotted: 0, counted: 0 };
     cardTable.put(row.id, row);
     res.json(row);
 });
@@ -85,17 +76,17 @@ export function cardStatsProblem(body) {
 // In one transaction with the read, so a count landing mid-edit isn't lost
 cards.patch("/api/admin/cards/:id", adminOnly, json, (req, res) => {
     const result = cardTable.update(req.params.id, row => {
+        const packs = req.body?.packs ?? packsOf(row);
         const card = {
             text: field(req.body, "text", row.text),
             description: field(req.body, "description", row.description, tidyLines),
-            pack: field(req.body, "pack", row.pack, String)
+            pack: String(packs?.[0] ?? "") // The one it shows
         };
-        const problem = cardProblem(card, row.id) ?? cardStatsProblem(req.body) ?? (req.body?.modes === undefined ? null : modesProblem(req.body.modes));
+        const problem = cardProblem(card, row.id) ?? packsProblem(packs) ?? cardStatsProblem(req.body);
         if (problem) return { error: problem };
         const stats = {};
         for (const name of ["counted", "spotted", "dealt"]) if (req.body?.[name] !== undefined) stats[name] = req.body[name];
-        if (req.body?.modes !== undefined) row.modes = req.body.modes;
-        return { row: Object.assign(row, card, stats) };
+        return { row: Object.assign(row, card, stats, { packs }) };
     });
     if (!result) return res.status(404).json({ error: "That card has been deleted." });
     if (result.error) return res.status(400).json(result);
@@ -114,8 +105,8 @@ cards.delete("/api/admin/cards/:id", adminOnly, (req, res) => {
 });
 
 cards.post("/api/admin/packs", adminOnly, json, (req, res) => {
-    const pack = { name: tidy(req.body?.name), description: tidy(req.body?.description), on: req.body?.on === true };
-    const problem = packProblem(pack);
+    const pack = { name: tidy(req.body?.name), description: tidy(req.body?.description), on: req.body?.on === true, modes: req.body?.modes ?? ["normal"] };
+    const problem = packProblem(pack) ?? modesProblem(pack.modes);
     if (problem) return res.status(400).json({ error: problem });
     const row = { id: randomUUID(), ...pack };
     packTable.put(row.id, row);
@@ -127,9 +118,10 @@ cards.patch("/api/admin/packs/:id", adminOnly, json, (req, res) => {
         const pack = {
             name: field(req.body, "name", row.name),
             description: field(req.body, "description", row.description),
-            on: field(req.body, "on", row.on, on => on === true)
+            on: field(req.body, "on", row.on, on => on === true),
+            modes: req.body?.modes ?? packModes(row)
         };
-        const problem = packProblem(pack, row.id);
+        const problem = packProblem(pack, row.id) ?? modesProblem(pack.modes);
         if (problem) return { error: problem };
         return { row: Object.assign(row, pack) };
     });
@@ -141,7 +133,7 @@ cards.patch("/api/admin/packs/:id", adminOnly, json, (req, res) => {
 cards.delete("/api/admin/packs/:id", adminOnly, (req, res) => {
     const error = transaction(() => {
         if (!packTable.get(req.params.id)) return [404, "Already deleted."];
-        if (cardTable.all().some(card => card.pack === req.params.id)) return [400, "Move or delete its cards first."];
+        if (cardTable.all().some(card => packsOf(card).includes(req.params.id))) return [400, "Take its cards out of it first."];
         if (packTable.all().length === 1) return [400, "Keep at least one pack."];
         packTable.remove(req.params.id);
     });
@@ -170,16 +162,16 @@ cards.patch("/api/admin/modes/:id", adminOnly, json, (req, res) => {
     res.json(result.row);
 });
 
-// Takes the mode off every card, then deletes it; a card left in no mode goes back to Normal, so it can still be dealt.
-// Rooms playing it deal from every card in their packs until the host picks another
+// Takes the mode off every pack, then deletes it; a pack left in no mode goes back to Normal, so its cards can still be
+// dealt. Rooms playing it deal from every card until the host picks another
 export function deleteMode(id) {
     if (id === "normal") return "Normal stays. Rename it if you like.";
     return transaction(() => {
         if (!modeTable.get(id)) return "Already deleted.";
-        for (const card of cardTable.all()) {
-            if (!modesOf(card).includes(id)) continue;
-            cardTable.update(card.id, row => {
-                const left = modesOf(row).filter(mode => mode !== id);
+        for (const pack of packTable.all()) {
+            if (!packModes(pack).includes(id)) continue;
+            packTable.update(pack.id, row => {
+                const left = packModes(row).filter(mode => mode !== id);
                 row.modes = left.length ? left : ["normal"];
             });
         }

@@ -3132,13 +3132,45 @@ button.collection-item:focus-visible {
     flex: 0 0 9.5rem;
     box-sizing: border-box;
 }
-.mode-ticks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 10px;
+/* A dropdown of tick boxes (a card's packs, a pack's modes): its button names what's ticked */
+.tick-dropdown {
+    position: relative;
 }
-.admin-row > .mode-ticks {
+.admin-row > .tick-dropdown, .admin-tools > .tick-dropdown {
     flex: 0 0 9.5rem;
+    min-width: 0;
+}
+.tick-dropdown > summary {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    list-style: none;
+    cursor: pointer;
+}
+.tick-dropdown > summary::-webkit-details-marker {
+    display: none;
+}
+.tick-dropdown > summary::after {
+    content: " ▾";
+    color: var(--text-faint);
+}
+.tick-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 100%;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background-color: var(--surface);
+    box-shadow: 0 12px 30px var(--shadow);
+    white-space: nowrap;
 }
 .admin-row > .admin-counts {
     display: flex;

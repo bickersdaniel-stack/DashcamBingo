@@ -72,7 +72,7 @@ export const profileTable = table("profiles");
 export const cardTable = table("cards");
 export const packTable = table("packs");
 export const suggestionTable = table("suggestions");
-export const modeTable = table("modes"); // Game modes: which cards a room deals from, picked before packs
+export const modeTable = table("modes"); // Game modes: hosts pick one, then which of its packs to deal from
 const settingTable = table("settings");
 
 export const getProfile = id => profileTable.get(id);
@@ -118,9 +118,16 @@ transaction(() => {
     modeTable.put("police-karma", { id: "police-karma", name: "Police Karma", description: "" });
 });
 
-// The game modes a card is dealt in; cards from before modes are Normal
-export const modesOf = card => card.modes ?? ["normal"];
-export const cardsIn = (packIds, mode = "normal") => cardTable.all().filter(card => packIds.includes(card.pack) && modesOf(card).includes(mode));
+// A card's packs. It can be in several; the first is the one it shows (its colour and name). Older cards have just one
+export const packsOf = card => card.packs ?? (card.pack ? [card.pack] : []);
+// The game modes a pack is in; packs from before modes are Normal
+export const packModes = pack => pack.modes ?? ["normal"];
+export const modePackIds = mode => packTable.all().filter(pack => packModes(pack).includes(mode)).map(pack => pack.id);
+// The cards in any of these packs that are in the mode (a card counts once, however many of them it's in)
+export function cardsIn(packIds, mode = "normal") {
+    const ids = new Set(modePackIds(mode).filter(id => packIds.includes(id)));
+    return cardTable.all().filter(card => packsOf(card).some(id => ids.has(id)));
+}
 export const defaultPacks = () => packTable.all().filter(pack => pack.on).map(pack => pack.id);
 
 // How often each card gets marked (spotted, for the admin page and dealing a fair mix) and every sighting

@@ -1,5 +1,5 @@
-// Admin page: review suggested squares, edit every card and its description, sort cards into packs and tick them into
-// game modes, manage people, and set how many coins players earn
+// Admin page: review suggested squares, edit every card and its description, put cards in packs and packs in game
+// modes, manage people, and set how many coins players earn
 const $ = id => document.getElementById(id);
 const pageSize = 25;
 const pages = { card: 1, user: 1 }; // The page each long list is on
@@ -14,6 +14,8 @@ document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", (
     pages.card = 1;
     showCards();
 }));
+// A tick-box dropdown closes when you click anywhere else
+document.addEventListener("click", event => document.querySelectorAll(".tick-dropdown[open]").forEach(menu => menu.contains(event.target) || menu.removeAttribute("open")));
 $("userSearch").addEventListener("input", () => {
     pages.user = 1;
     showUsers();
@@ -22,8 +24,7 @@ $("userSearch").addEventListener("input", () => {
 $("newCardForm").addEventListener("submit", async event => {
     event.preventDefault();
     const result = await api("POST", "/api/admin/cards", {
-        text: $("newCardText").value, description: $("newCardDescription").value, pack: $("newCardPack").value,
-        modes: [...$("newCardModes").querySelectorAll("input:checked")].map(box => box.value)
+        text: $("newCardText").value, description: $("newCardDescription").value, packs: ticked($("newCardPacks"))
     });
     if (!done(result, "Card added.")) return;
     $("newCardText").value = $("newCardDescription").value = "";
@@ -32,7 +33,9 @@ $("newCardForm").addEventListener("submit", async event => {
 
 $("newPackForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const result = await api("POST", "/api/admin/packs", { name: $("newPackName").value, description: $("newPackDescription").value, on: $("newPackOn").checked });
+    const result = await api("POST", "/api/admin/packs", {
+        name: $("newPackName").value, description: $("newPackDescription").value, on: $("newPackOn").checked, modes: ticked($("newPackModes"))
+    });
     if (!done(result, "Pack added.")) return;
     $("newPackName").value = $("newPackDescription").value = "";
     $("newPackOn").checked = false;
@@ -42,7 +45,7 @@ $("newPackForm").addEventListener("submit", async event => {
 $("newModeForm").addEventListener("submit", async event => {
     event.preventDefault();
     const result = await api("POST", "/api/admin/modes", { name: $("newModeName").value, description: $("newModeDescription").value });
-    if (!done(result, "Mode added. Tick cards into it on the Cards tab.")) return;
+    if (!done(result, "Mode added. Tick packs into it on the Packs tab.")) return;
     $("newModeName").value = $("newModeDescription").value = "";
     load();
 });
@@ -62,18 +65,15 @@ async function load() {
     if (!people.ok) return message(people.data.error, false);
     ({ packs, modes, cards } = all.data);
     users = people.data;
-    fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
+    $("newCardPacks").replaceWith(Object.assign(tickDropdown("packs", packs, [firstOnPack()]), { id: "newCardPacks" }));
+    $("newPackModes").replaceWith(Object.assign(tickDropdown("modes", modes, ["normal"]), { id: "newPackModes" }));
     const filter = $("cardPackFilter").value;
     $("cardPackFilter").replaceChildren(new Option("All packs", "all"), ...packs.map(pack => new Option(pack.name, pack.id)));
     $("cardPackFilter").value = packs.some(pack => pack.id === filter) ? filter : "all";
     const modeFilter = $("cardModeFilter").value;
     $("cardModeFilter").replaceChildren(new Option("All modes", "all"), ...modes.map(mode => new Option(mode.name, mode.id)));
     $("cardModeFilter").value = modes.some(mode => mode.id === modeFilter) ? modeFilter : "all";
-    $("newCardModes").replaceChildren(...modes.map(mode => {
-        const label = el("label", "check-label");
-        label.append(Object.assign(document.createElement("input"), { type: "checkbox", value: mode.id, checked: mode.id === "normal" }), ` ${mode.name}`);
-        return label;
-    }));
+
     showSuggestions(waiting.data.pending ?? []);
     showCards();
     showPacks();
@@ -109,8 +109,9 @@ function showCards() {
     const filter = $("cardPackFilter").value;
     const modeFilter = $("cardModeFilter").value;
     const sort = $("cardSort").value;
+    const modePacks = packs.filter(pack => pack.modes.includes(modeFilter)).map(pack => pack.id);
     const shown = cards
-        .filter(card => (filter === "all" || card.pack === filter) && (modeFilter === "all" || card.modes.includes(modeFilter))
+        .filter(card => (filter === "all" || card.packs.includes(filter)) && (modeFilter === "all" || card.packs.some(id => modePacks.includes(id)))
             && (`${card.text} ${card.description}`).toLowerCase().includes(search))
         .sort((a, b) => {
             if (sort === "az") return a.text.localeCompare(b.text);
@@ -125,7 +126,7 @@ function showCards() {
         const item = el("li", "item admin-row");
         const text = input(card.text, 60, "Card wording");
         const description = textarea(card.description, "Description (optional)");
-        const pack = fillPackSelect(el("select", "quality-select pack-select"), card.pack);
+        const cardPacks = packTicks(card);
         const counted = Object.assign(input(String(card.counted ?? 0), 6, `Counted for ${card.text}`), { type: "number", min: 0, max: 100000 });
         const spotted = Object.assign(input(String(card.spotted ?? 0), 6, `Marked deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
         const dealt = Object.assign(input(String(card.dealt ?? 0), 6, `Deals for ${card.text}`), { type: "number", min: 0, max: 100000 });
@@ -141,7 +142,7 @@ function showCards() {
         stats.title = "Counted is every sighting. Marked / dealt is how often it was on a card and got marked.";
         const save = button("Save", "btn btn-primary", async () => {
             const result = await api("PATCH", `/api/admin/cards/${card.id}`, {
-                text: text.value, description: description.value, pack: pack.value,
+                text: text.value, description: description.value,
                 counted: Number(counted.value), spotted: Number(spotted.value), dealt: Number(dealt.value)
             });
             if (done(result, "Saved.")) load();
@@ -151,33 +152,45 @@ function showCards() {
             if (done(await api("DELETE", `/api/admin/cards/${card.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(text, description, pack, modeTicks(card), stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
+        item.append(text, description, cardPacks, stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
         return item;
     }));
 }
 
-// One tick box per game mode. Each saves the moment it's ticked, without the row's Save, so filling a mode is quick
-function modeTicks(card) {
-    const ticks = el("span", "mode-ticks");
-    ticks.append(...modes.map(mode => {
-        const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: card.modes.includes(mode.id) });
+// The packs a card is in, as a tick-box dropdown. Each tick saves straight away, without the row's Save, so filling a
+// pack from the Cards tab is quick. The first pack is the one the card shows
+function packTicks(card) {
+    const menu = tickDropdown("packs", packs, card.packs);
+    const stay = event => event.stopPropagation(); // So the row doesn't think it has unsaved edits
+    menu.addEventListener("input", stay);
+    menu.addEventListener("change", async event => {
+        stay(event);
+        const result = await api("PATCH", `/api/admin/cards/${card.id}`, { packs: ticked(menu) });
+        if (done(result, `Saved the packs for "${card.text}".`)) card.packs = result.data.packs;
+        menu.replaceWith(packTicks(card)); // Redrawn either way: a refused change goes back
+    });
+    return menu;
+}
+
+// A dropdown of tick boxes: its button names what's ticked, and the boxes open below it
+function tickDropdown(what, options, chosen) {
+    const menu = el("details", "tick-dropdown");
+    const summary = el("summary", "quality-select");
+    summary.ariaLabel = `Choose ${what}`;
+    const list = el("div", "tick-menu");
+    list.append(...options.map(option => {
         const label = el("label", "check-label");
-        label.append(box, ` ${mode.name}`);
-        const stay = event => event.stopPropagation(); // So the row doesn't think it has unsaved edits
-        box.addEventListener("input", stay);
-        box.addEventListener("change", async event => {
-            stay(event);
-            const next = modes.filter(m => m.id === mode.id ? box.checked : card.modes.includes(m.id)).map(m => m.id);
-            const result = await api("PATCH", `/api/admin/cards/${card.id}`, { modes: next });
-            if (!done(result, `"${card.text}" is ${box.checked ? "in" : "out of"} ${mode.name}.`)) return box.checked = !box.checked;
-            card.modes = result.data.modes;
-            mode.count += box.checked ? 1 : -1;
-            showModes();
-        });
+        label.append(Object.assign(document.createElement("input"), { type: "checkbox", value: option.id, checked: chosen.includes(option.id) }), ` ${option.name}`);
         return label;
     }));
-    return ticks;
+    const name = () => summary.textContent = options.filter(option => ticked(menu).includes(option.id)).map(option => option.name).join(", ") || `No ${what}`;
+    menu.append(summary, list);
+    list.addEventListener("change", name);
+    name();
+    return menu;
 }
+
+const ticked = menu => [...menu.querySelectorAll("input:checked")].map(box => box.value);
 
 function showModes() {
     $("modeList").replaceChildren(...modes.map(mode => {
@@ -189,7 +202,7 @@ function showModes() {
             if (done(result, "Saved.")) load();
         });
         const remove = mode.id === "normal" ? el("span", "") : button("Delete", "link-button", async () => {
-            if (!confirm(`Delete the "${mode.name}" mode? Its cards stay in their other modes.`)) return;
+            if (!confirm(`Delete the "${mode.name}" mode? Its packs stay, in their other modes.`)) return;
             if (done(await api("DELETE", `/api/admin/modes/${mode.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
@@ -207,8 +220,9 @@ function showPacks() {
         const on = Object.assign(document.createElement("input"), { type: "checkbox", checked: pack.on });
         const onLabel = el("label", "check-label");
         onLabel.append(on, " On by default");
+        const packModes = tickDropdown("modes", modes, pack.modes);
         const save = button("Save", "btn btn-primary", async () => {
-            const result = await api("PATCH", `/api/admin/packs/${pack.id}`, { name: name.value, description: description.value, on: on.checked });
+            const result = await api("PATCH", `/api/admin/packs/${pack.id}`, { name: name.value, description: description.value, on: on.checked, modes: ticked(packModes) });
             if (done(result, "Saved.")) load();
         });
         const remove = button("Delete", "link-button", async () => {
@@ -216,7 +230,7 @@ function showPacks() {
             if (done(await api("DELETE", `/api/admin/packs/${pack.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(name, description, onLabel, el("span", "admin-stats", `${pack.count} card${pack.count === 1 ? "" : "s"}`), save, remove);
+        item.append(name, description, packModes, onLabel, el("span", "admin-stats", `${pack.count} card${pack.count === 1 ? "" : "s"}`), save, remove);
         return item;
     }));
 }

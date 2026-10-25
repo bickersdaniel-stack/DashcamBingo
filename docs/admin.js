@@ -1,15 +1,16 @@
-// Admin page: review suggested squares, edit every card and its description, sort cards into packs, manage people,
-// and set how many coins players earn
+// Admin page: review suggested squares, edit every card and its description, sort cards into packs and tick them into
+// game modes, manage people, and set how many coins players earn
 const $ = id => document.getElementById(id);
 const pageSize = 25;
 const pages = { card: 1, user: 1 }; // The page each long list is on
 const coinKeys = ["bingoCoins", "coinsPerRound", "countCoinsPerDay"]; // Also the ids of their inputs
 let packs = [];
+let modes = [];
 let cards = [];
 let users = [];
 
 document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
-["cardSearch", "cardPackFilter", "cardSort"].forEach(id => $(id).addEventListener("input", () => {
+["cardSearch", "cardPackFilter", "cardModeFilter", "cardSort"].forEach(id => $(id).addEventListener("input", () => {
     pages.card = 1;
     showCards();
 }));
@@ -20,7 +21,10 @@ $("userSearch").addEventListener("input", () => {
 
 $("newCardForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const result = await api("POST", "/api/admin/cards", { text: $("newCardText").value, description: $("newCardDescription").value, pack: $("newCardPack").value });
+    const result = await api("POST", "/api/admin/cards", {
+        text: $("newCardText").value, description: $("newCardDescription").value, pack: $("newCardPack").value,
+        modes: [...$("newCardModes").querySelectorAll("input:checked")].map(box => box.value)
+    });
     if (!done(result, "Card added.")) return;
     $("newCardText").value = $("newCardDescription").value = "";
     load();
@@ -32,6 +36,14 @@ $("newPackForm").addEventListener("submit", async event => {
     if (!done(result, "Pack added.")) return;
     $("newPackName").value = $("newPackDescription").value = "";
     $("newPackOn").checked = false;
+    load();
+});
+
+$("newModeForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = await api("POST", "/api/admin/modes", { name: $("newModeName").value, description: $("newModeDescription").value });
+    if (!done(result, "Mode added. Tick cards into it on the Cards tab.")) return;
+    $("newModeName").value = $("newModeDescription").value = "";
     load();
 });
 
@@ -48,15 +60,24 @@ async function load() {
     ]);
     if (!all.ok) return message(all.data.error, false);
     if (!people.ok) return message(people.data.error, false);
-    ({ packs, cards } = all.data);
+    ({ packs, modes, cards } = all.data);
     users = people.data;
     fillPackSelect($("newCardPack"), $("newCardPack").value || firstOnPack());
     const filter = $("cardPackFilter").value;
     $("cardPackFilter").replaceChildren(new Option("All packs", "all"), ...packs.map(pack => new Option(pack.name, pack.id)));
     $("cardPackFilter").value = packs.some(pack => pack.id === filter) ? filter : "all";
+    const modeFilter = $("cardModeFilter").value;
+    $("cardModeFilter").replaceChildren(new Option("All modes", "all"), ...modes.map(mode => new Option(mode.name, mode.id)));
+    $("cardModeFilter").value = modes.some(mode => mode.id === modeFilter) ? modeFilter : "all";
+    $("newCardModes").replaceChildren(...modes.map(mode => {
+        const label = el("label", "check-label");
+        label.append(Object.assign(document.createElement("input"), { type: "checkbox", value: mode.id, checked: mode.id === "normal" }), ` ${mode.name}`);
+        return label;
+    }));
     showSuggestions(waiting.data.pending ?? []);
     showCards();
     showPacks();
+    showModes();
     showUsers();
     showCoins(settings.data);
     return waiting.data.pending?.length ?? 0;
@@ -86,9 +107,11 @@ const rate = card => card.dealt >= 10 ? card.spotted / card.dealt : null;
 function showCards() {
     const search = $("cardSearch").value.trim().toLowerCase();
     const filter = $("cardPackFilter").value;
+    const modeFilter = $("cardModeFilter").value;
     const sort = $("cardSort").value;
     const shown = cards
-        .filter(card => (filter === "all" || card.pack === filter) && (`${card.text} ${card.description}`).toLowerCase().includes(search))
+        .filter(card => (filter === "all" || card.pack === filter) && (modeFilter === "all" || card.modes.includes(modeFilter))
+            && (`${card.text} ${card.description}`).toLowerCase().includes(search))
         .sort((a, b) => {
             if (sort === "az") return a.text.localeCompare(b.text);
             const [ra, rb] = [rate(a), rate(b)];
@@ -128,7 +151,50 @@ function showCards() {
             if (done(await api("DELETE", `/api/admin/cards/${card.id}`), "Deleted.")) load();
         });
         showSaveWhenEdited(item, save);
-        item.append(text, description, pack, stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
+        item.append(text, description, pack, modeTicks(card), stats, el("span", "item-by", card.by ? `from ${card.by.name}` : ""), save, remove);
+        return item;
+    }));
+}
+
+// One tick box per game mode. Each saves the moment it's ticked, without the row's Save, so filling a mode is quick
+function modeTicks(card) {
+    const ticks = el("span", "mode-ticks");
+    ticks.append(...modes.map(mode => {
+        const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: card.modes.includes(mode.id) });
+        const label = el("label", "check-label");
+        label.append(box, ` ${mode.name}`);
+        const stay = event => event.stopPropagation(); // So the row doesn't think it has unsaved edits
+        box.addEventListener("input", stay);
+        box.addEventListener("change", async event => {
+            stay(event);
+            const next = modes.filter(m => m.id === mode.id ? box.checked : card.modes.includes(m.id)).map(m => m.id);
+            const result = await api("PATCH", `/api/admin/cards/${card.id}`, { modes: next });
+            if (!done(result, `"${card.text}" is ${box.checked ? "in" : "out of"} ${mode.name}.`)) return box.checked = !box.checked;
+            card.modes = result.data.modes;
+            mode.count += box.checked ? 1 : -1;
+            showModes();
+        });
+        return label;
+    }));
+    return ticks;
+}
+
+function showModes() {
+    $("modeList").replaceChildren(...modes.map(mode => {
+        const item = el("li", "item admin-row");
+        const name = input(mode.name, 30, "Mode name");
+        const description = input(mode.description, 140, "Description (optional)");
+        const save = button("Save", "btn btn-primary", async () => {
+            const result = await api("PATCH", `/api/admin/modes/${mode.id}`, { name: name.value, description: description.value });
+            if (done(result, "Saved.")) load();
+        });
+        const remove = mode.id === "normal" ? el("span", "") : button("Delete", "link-button", async () => {
+            if (!confirm(`Delete the "${mode.name}" mode? Its cards stay in their other modes.`)) return;
+            if (done(await api("DELETE", `/api/admin/modes/${mode.id}`), "Deleted.")) load();
+        });
+        showSaveWhenEdited(item, save);
+        const count = `${mode.count} card${mode.count === 1 ? "" : "s"}${mode.count < 24 ? " · needs 24" : ""}`;
+        item.append(name, description, el("span", "admin-stats", count), save, remove);
         return item;
     }));
 }

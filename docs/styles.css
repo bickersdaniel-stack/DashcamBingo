@@ -3132,6 +3132,14 @@ button.collection-item:focus-visible {
     flex: 0 0 9.5rem;
     box-sizing: border-box;
 }
+.mode-ticks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+}
+.admin-row > .mode-ticks {
+    flex: 0 0 9.5rem;
+}
 .admin-row > .admin-counts {
     display: flex;
     flex-wrap: wrap;

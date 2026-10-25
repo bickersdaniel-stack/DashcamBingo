@@ -21,6 +21,7 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS packs (id TEXT PRIMARY KEY, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS suggestions (id TEXT PRIMARY KEY, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS modes (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 `);
 
 let depth = 0;
@@ -71,6 +72,7 @@ export const profileTable = table("profiles");
 export const cardTable = table("cards");
 export const packTable = table("packs");
 export const suggestionTable = table("suggestions");
+export const modeTable = table("modes"); // Game modes: which cards a room deals from, picked before packs
 const settingTable = table("settings");
 
 export const getProfile = id => profileTable.get(id);
@@ -109,7 +111,16 @@ const imported = transaction(() => {
 });
 if (imported && oldFile && existsSync(oldFile)) renameSync(oldFile, join(dataDir, "store.imported.json"));
 
-export const cardsIn = packIds => cardTable.all().filter(card => packIds.includes(card.pack));
+// Normal, which is every card until an admin unticks it, and Police Karma to start; admins add more
+transaction(() => {
+    if (db.prepare("SELECT count(*) AS n FROM modes").get().n > 0) return;
+    modeTable.put("normal", { id: "normal", name: "Normal", description: "" });
+    modeTable.put("police-karma", { id: "police-karma", name: "Police Karma", description: "" });
+});
+
+// The game modes a card is dealt in; cards from before modes are Normal
+export const modesOf = card => card.modes ?? ["normal"];
+export const cardsIn = (packIds, mode = "normal") => cardTable.all().filter(card => packIds.includes(card.pack) && modesOf(card).includes(mode));
 export const defaultPacks = () => packTable.all().filter(pack => pack.on).map(pack => pack.id);
 
 // How often each card gets marked (spotted, for the admin page and dealing a fair mix) and every sighting

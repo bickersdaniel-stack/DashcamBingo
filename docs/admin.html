@@ -44,6 +44,7 @@
             <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="suggestionsPanel" id="suggestionsTab">Suggestions</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="cardsPanel" id="cardsTab">Cards</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="packsPanel">Packs</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="modesPanel">Modes</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="usersPanel">Users</button>
             <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="coinsPanel">Coins</button>
         </div>
@@ -59,11 +60,13 @@
                 <input class="link-input" id="newCardText" maxlength="60" placeholder="New card, e.g. Kangaroo on the road" autocomplete="off" aria-label="New card wording">
                 <textarea class="link-input" id="newCardDescription" maxlength="300" rows="1" placeholder="Description (optional)" aria-label="New card description"></textarea>
                 <select class="quality-select pack-select" id="newCardPack" aria-label="Pack for the new card"></select>
+                <span class="mode-ticks" id="newCardModes" role="group" aria-label="Game modes for the new card"></span>
                 <button class="btn btn-primary" type="submit">Add card</button>
             </form>
             <div class="admin-tools">
                 <input class="link-input" id="cardSearch" type="search" placeholder="Search cards" autocomplete="off" aria-label="Search cards">
                 <select class="quality-select" id="cardPackFilter" aria-label="Show cards from"></select>
+                <select class="quality-select" id="cardModeFilter" aria-label="Show cards in game mode"></select>
                 <select class="quality-select" id="cardSort" aria-label="Sort cards">
                     <option value="az">A to Z</option>
                     <option value="most">Most spotted</option>
@@ -84,6 +87,16 @@
                 <button class="btn btn-primary" type="submit">Add pack</button>
             </form>
             <ul class="item-list" id="packList"></ul>
+        </section>
+
+        <section class="admin-panel" id="modesPanel" role="tabpanel" hidden>
+            <p class="admin-hint">Hosts pick a game mode before their packs, and only cards ticked into that mode are dealt. Tick cards into modes on the Cards tab. A mode needs 24 cards to play, and Normal can be renamed but not deleted.</p>
+            <form class="admin-tools add" id="newModeForm">
+                <input class="link-input" id="newModeName" maxlength="30" placeholder="New mode name" autocomplete="off" aria-label="New mode name">
+                <input class="link-input" id="newModeDescription" maxlength="140" placeholder="Description (optional)" autocomplete="off" aria-label="New mode description">
+                <button class="btn btn-primary" type="submit">Add mode</button>
+            </form>
+            <ul class="item-list" id="modeList"></ul>
         </section>
 
         <section class="admin-panel" id="usersPanel" role="tabpanel" hidden>

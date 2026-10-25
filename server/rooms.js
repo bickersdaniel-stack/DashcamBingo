@@ -2,7 +2,7 @@
 import { countLines, isOneAway } from "../docs/shared/lines.js";
 import { recordProgress, sydneyHour } from "./achievements.js";
 import { lookOf, reactionsOf, skinInfo, wornExtra } from "./shop.js";
-import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, packTable, removeWin, touchProfile, updateProfile } from "./store.js";
+import { addCoins, addWin, cardTable, cardsIn, coinSettings, coinsOf, countSpot, defaultPacks, earnCountCoin, getProfile, isBlocked, markDealt, modeTable, modesOf, packTable, removeWin, touchProfile, updateProfile } from "./store.js";
 
 const codeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // No I, L, O, 0 or 1, which look alike
 const maxRooms = 200; // shortcut: one cap for everyone stops endless room creation; add a per-person limit if it's ever opened up widely
@@ -33,11 +33,12 @@ export function setupRooms(io) {
             let code;
             do code = Array.from({ length: 5 }, () => codeLetters[Math.floor(Math.random() * codeLetters.length)]).join("");
             while (rooms.has(code));
+            const mode = modeFrom(data?.mode) ?? "normal";
             const room = {
                 code, hostId: user.id, players: new Map(), connections: new Map(), round: null, lastRound: null,
                 nextEventId: 1, emptySince: Date.now(), hostAwaySince: null, streamSocket: null,
                 rerolls: rerollsFrom(data?.rerolls) ?? 0,
-                packs: packsFrom(data?.packs) ?? defaultPacks()
+                mode, packs: packsFrom(data?.packs, mode) ?? defaultPacks()
             };
             startRound(room, videoFrom(data));
             rooms.set(code, room);
@@ -151,13 +152,15 @@ export function setupRooms(io) {
         });
 
         // Which packs the next cards come from; cards already dealt stay as they are
-        socket.on("host:packs", data => {
+        // The game mode and its packs for the next round or reroll, checked together so there are enough cards
+        socket.on("host:deck", data => {
             const room = rooms.get(socket.data.code);
             if (!room || room.hostId !== user.id) return;
-            const packs = packsFrom(data?.packs);
+            const mode = modeFrom(data?.mode);
+            const packs = mode && packsFrom(data?.packs, mode);
             if (!packs) return;
-            room.packs = packs;
-            io.to(room.code).emit("packs:update", packs);
+            Object.assign(room, { mode, packs });
+            io.to(room.code).emit("deck:update", { mode: modeInfo(mode), packs });
         });
 
         socket.on("card:reroll", data => {
@@ -310,15 +313,23 @@ function startRound(room, video = null, replace = false) {
     const number = (room.round?.number ?? 0) + (replace ? 0 : 1);
     // The round that's ending stays in the feed under its number (a replaced round had nothing in it)
     if (room.round && !replace) room.pastRounds = [{ number: room.round.number, events: room.round.events }, ...(room.pastRounds ?? [])].slice(0, keptRounds);
-    room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, cards: new Map(), events: [] };
+    room.round = { id: (room.round?.id ?? 0) + 1, number, startedAt: Date.now(), video, mode: room.mode ?? "normal", cards: new Map(), events: [] };
     for (const id of room.players.keys()) room.round.cards.set(id, dealCard(room));
 }
 
-// 24 cards from the room's packs around FREE in the middle. The words are copied, so editing a card
+// The cards a room deals from: its mode's cards in its packs. If a pack was emptied, a mode deleted or cards untagged
+// mid-room, the whole mode, then every card
+export function deckFor(room) {
+    const all = cardTable.all();
+    const inMode = all.filter(card => modesOf(card).includes(room.mode ?? "normal"));
+    const inPacks = inMode.filter(card => room.packs.includes(card.pack));
+    return [inPacks, inMode].find(deck => deck.length >= 24) ?? all;
+}
+
+// 24 cards from the room's deck around FREE in the middle. The words are copied, so editing a card
 // mid-round doesn't change squares people are looking at; each card counts as dealt for the stats
 function dealCard(room) {
-    const deck = cardsIn(room.packs);
-    const picked = pickCards(deck.length >= 24 ? deck : cardTable.all()); // A pack was emptied or deleted mid-room
+    const picked = pickCards(deckFor(room));
     markDealt(picked.map(card => card.id));
     picked.splice(12, 0, null);
     return {
@@ -381,12 +392,15 @@ function shuffle(list, random = Math.random) {
     return out;
 }
 
-// The packs a host picked, if they exist and hold enough cards to fill a card
-export function packsFrom(value) {
+// The packs a host picked, if they exist and hold enough of the mode's cards to fill a card
+export function packsFrom(value, mode = "normal") {
     if (!Array.isArray(value)) return null;
     const ids = [...new Set(value)].filter(id => typeof id === "string" && packTable.get(id));
-    return cardsIn(ids).length >= 24 ? ids : null;
+    return cardsIn(ids, mode).length >= 24 ? ids : null;
 }
+
+export const modeFrom = value => typeof value === "string" && modeTable.get(value) ? value : null;
+const modeInfo = id => ({ id, name: modeTable.get(id)?.name ?? "Normal" }); // A deleted mode still has a name to show
 
 export function rerollsFrom(value) {
     const n = Number(value);
@@ -491,7 +505,8 @@ function stateFor(room, userId) {
     return {
         code: room.code, hostId: room.hostId, rerolls: room.rerolls ?? 0, packs: room.packs,
         reactions: reactionsOf(profile), stamp: wornExtra(profile, "stamp")?.id ?? null, // Only you see your stamp
-        round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video) },
+        mode: modeInfo(room.mode ?? "normal"),
+        round: { id: room.round.id, number: room.round.number, video: videoInfo(room.round.video), mode: modeInfo(room.round.mode ?? "normal") },
         lastRound: room.lastRound,
         streamFrom: room.streamSocket,
         players: [...room.players.values()].map(player => playerInfo(room, player)),

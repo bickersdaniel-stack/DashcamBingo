@@ -230,11 +230,13 @@
             </div>
             <form class="lobby lobby-setup" id="setup" hidden>
                 <h2>Set up your room</h2>
-                <p>You can change the packs and rerolls later from Room settings.</p>
+                <p>You can change the game mode, packs and rerolls later from Room settings.</p>
                 <label class="setup-label" for="createLink">YouTube video <span>Optional, you can add one later</span></label>
                 <input class="link-input" id="createLink" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false">
                 <!-- The host's Room settings dialog borrows these same fields -->
                 <div class="room-options" id="roomOptions">
+                    <label class="setup-label" for="roomMode">Game mode <span>Which cards get dealt. Normal suits most dashcam videos</span></label>
+                    <select class="quality-select" id="roomMode"></select>
                     <p class="setup-label">Packs</p>
                     <div class="pack-choices" id="packChoices"></div>
                     <p class="pack-total" id="packTotal" role="status"></p>

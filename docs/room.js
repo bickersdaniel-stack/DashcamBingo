@@ -130,7 +130,7 @@ function showLobby() {
         if (text && !video) return showError("That doesn't look like a YouTube link. Leave it empty to add a video later.", "setupError");
         if (!showPackTotal()) return;
         $("createButton").disabled = true;
-        const payload = { rerolls: Number($("roomRerolls").value), packs: chosenPacks() };
+        const payload = { rerolls: Number($("roomRerolls").value), mode: $("roomMode").value, packs: chosenPacks() };
         if (video) Object.assign(payload, { videoId: video.id, start: video.start });
         socket.timeout(5000).emit("room:create", payload, (timedOut, result) => {
             if (result?.code) return location.assign(`/r/${result.code}`);
@@ -258,8 +258,8 @@ function joinRoom() {
         showMyCoins(achievement.total);
         showAchievementToast(achievement);
     });
-    socket.on("packs:update", packs => {
-        if (state) state.packs = packs;
+    socket.on("deck:update", ({ mode, packs }) => {
+        if (state) Object.assign(state, { mode, packs });
     });
     socket.on("rtc:signal", ({ from, data }) => {
         if (shareStream && data?.type === "hello") return sendStream(socket, from);
@@ -310,14 +310,14 @@ function joinRoom() {
     document.querySelectorAll(".open-settings").forEach(button => button.addEventListener("click", async () => {
         setPanelOpen("room", false);
         $("settingsForm").prepend($("roomOptions"));
-        await fillRoomOptions(state.packs, state.rerolls ?? 0);
+        await fillRoomOptions({ mode: state.mode.id, packs: state.packs }, state.rerolls ?? 0);
         $("settingsDialog").showModal();
     }));
     $("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
     $("settingsForm").addEventListener("submit", event => {
         event.preventDefault();
         if (!showPackTotal()) return;
-        socket.emit("host:packs", { packs: chosenPacks() });
+        socket.emit("host:deck", { mode: $("roomMode").value, packs: chosenPacks() });
         socket.emit("host:rerolls", { rerolls: Number($("roomRerolls").value) });
         $("settingsDialog").close();
     });
@@ -340,7 +340,8 @@ function joinRoom() {
 function showRoom(socket) {
     show("roomGrid");
     $("roomCode").textContent = state.code;
-    $("roundNumber").textContent = `Round ${state.round.number}`;
+    const mode = state.round.mode;
+    $("roundNumber").textContent = mode && mode.id !== "normal" ? `Round ${state.round.number} · ${mode.name}` : `Round ${state.round.number}`;
 
     marked = new Set(state.card.counts.flatMap((count, index) => count > 0 ? [index] : []));
     bestLines = state.card.bestLines; // A refresh doesn't screenshot a line you already had
@@ -1080,22 +1081,38 @@ function setUpSuggestions() {
 }
 
 // The packs and rerolls fields, used by the setup screen and by the host's Room settings
-let packInfo = []; // Each pack with how many cards it holds
+let packInfo = []; // Each pack with how many cards it holds in each game mode
+let modeInfo = []; // Each game mode with how many cards it holds
 
+// The game mode first, then the packs holding its cards. chosen: the room's mode and packs, or null for a new room
 async function fillRoomOptions(chosen, rerolls) {
     const { data } = await api("GET", "/api/cards");
     packInfo = data.packs ?? [];
-    $("packChoices").replaceChildren(...packInfo.map(pack => {
+    modeInfo = data.modes ?? [];
+    $("roomMode").replaceChildren(...modeInfo.map(mode => Object.assign(
+        new Option(`${mode.name} · ${mode.count} card${mode.count === 1 ? "" : "s"}${mode.count < 24 ? " (needs 24)" : ""}`, mode.id),
+        { disabled: mode.count < 24 })));
+    $("roomMode").value = modeInfo.some(mode => mode.id === chosen?.mode) ? chosen.mode : "normal"; // Its mode may have been deleted
+    $("roomMode").onchange = () => showModePacks(null);
+    showModePacks(chosen?.packs ?? null);
+    $("roomRerolls").value = String(rerolls);
+}
+
+// Only packs with cards in the chosen mode, with how many of its cards each holds. Normal starts with the packs that
+// are on by default, other modes with every pack that has their cards
+function showModePacks(chosen) {
+    const mode = $("roomMode").value;
+    $("packChoices").replaceChildren(...packInfo.filter(pack => pack.counts[mode] > 0).map(pack => {
+        const count = pack.counts[mode];
         const choice = el("label", "pack-choice");
-        const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : pack.on });
+        const box = Object.assign(document.createElement("input"), { type: "checkbox", value: pack.id, checked: chosen ? chosen.includes(pack.id) : mode !== "normal" || pack.on });
         const words = el("span", "pack-words");
-        words.append(el("strong", "", pack.name), el("span", "pack-count", `${pack.count} card${pack.count === 1 ? "" : "s"}`));
+        words.append(el("strong", "", pack.name), el("span", "pack-count", `${count} card${count === 1 ? "" : "s"}`));
         if (pack.description) words.append(el("span", "pack-description", pack.description));
         choice.append(box, words);
         return choice;
     }));
     $("packChoices").onchange = showPackTotal;
-    $("roomRerolls").value = String(rerolls);
     showPackTotal();
 }
 
@@ -1103,7 +1120,8 @@ const chosenPacks = () => [...$("packChoices").querySelectorAll("input:checked")
 
 // A card has 24 squares, so Create room and Save wait until the ticked packs hold that many
 function showPackTotal() {
-    const total = packInfo.filter(pack => chosenPacks().includes(pack.id)).reduce((sum, pack) => sum + pack.count, 0);
+    const mode = $("roomMode").value;
+    const total = packInfo.filter(pack => chosenPacks().includes(pack.id)).reduce((sum, pack) => sum + (pack.counts[mode] ?? 0), 0);
     const enough = total >= 24;
     $("packTotal").textContent = enough ? `${total} cards to deal from` : `Only ${total} cards. Pick packs with at least 24.`;
     $("packTotal").classList.toggle("error", !enough);
